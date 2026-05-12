@@ -1,72 +1,79 @@
-import { createHash } from 'node:crypto'
-import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve, relative } from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
+import { defineConfig, type Plugin } from 'vite'
 
-const DEFAULT_VAULT_DIR = resolve(process.cwd(), '微积分二层次下')
+const LOCAL_API_ROUTE_PREFIX = '/__any-reader-local/'
 const VAULT_ROUTE_PREFIX = '/vault/'
-const VAULT_MANIFEST_ROUTE = '/vault-manifest.json'
+const DEFAULT_VAULT_DIR_NAME = '微积分二层次下'
+const LOCAL_STATE_DIR_NAME = 'any-reader-data'
 
-interface VaultManifestDocument {
-  path: string
-  title: string
-  parentPath: string | null
-  order: number
-  level: number
-  contentMd: string
-  contentVersion: string
-  contentPlainText: string
-}
-
-interface VaultManifest {
-  vaultName: string
-  vaultDir: string
-  generatedAt: string
-  documents: VaultManifestDocument[]
-  folderPaths: string[]
-}
-
-interface SafeVaultFile {
+interface SafeLocalPath {
   absolutePath: string
-  mimeType: string
+  payloadRelativePath: string
+  kind: 'state' | 'vault'
 }
 
-const IGNORED_FOLDER_NAMES = new Set([
-  '.git',
-  '.github',
-  '.codex-tmp',
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'tmp',
-  'temp',
-  'attachments'
-])
-
-function normalizeVaultRelativePath(input: string) {
-  return input.replace(/\\/g, '/').replace(/^\/+/, '')
+function normalizeLocalPath(input: string) {
+  return input
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((segment) => segment && segment !== '.')
+    .join('/')
 }
 
-function stripMarkdownExtension(path: string) {
-  return path.replace(/\.md$/i, '')
+function safeResolve(baseDir: string, relativePath: string) {
+  const normalized = normalizeLocalPath(relativePath)
+  if (normalized.split('/').includes('..')) {
+    return null
+  }
+
+  const absolutePath = resolve(baseDir, normalized)
+  const relativeToBase = relative(baseDir, absolutePath)
+  if (relativeToBase.startsWith('..') || resolve(absolutePath) === resolve(baseDir, '..')) {
+    return null
+  }
+
+  return absolutePath
 }
 
-function basenameFromPath(path: string) {
-  const segments = normalizeVaultRelativePath(path).split('/').filter(Boolean)
-  return segments.at(-1) ?? ''
+function resolveApiPath(args: {
+  requestPath: string
+  stateDir: string
+  vaultDir: string
+  forWrite?: boolean
+}): SafeLocalPath | null {
+  const normalized = normalizeLocalPath(args.requestPath)
+  const vaultPrefix = `${DEFAULT_VAULT_DIR_NAME}/`
+  const isVaultPath = normalized === DEFAULT_VAULT_DIR_NAME || normalized.startsWith(vaultPrefix)
+  const kind = isVaultPath ? 'vault' : 'state'
+
+  if (args.forWrite && kind !== 'state') {
+    return null
+  }
+
+  const baseDir = kind === 'vault' ? args.vaultDir : args.stateDir
+  const payloadRelativePath = kind === 'vault' ? normalized.slice(DEFAULT_VAULT_DIR_NAME.length).replace(/^\/+/, '') : normalized
+  const absolutePath = safeResolve(baseDir, payloadRelativePath)
+
+  return absolutePath
+    ? {
+        absolutePath,
+        payloadRelativePath,
+        kind
+      }
+    : null
 }
 
-function dirnameFromPath(path: string) {
-  const segments = normalizeVaultRelativePath(path).split('/').filter(Boolean)
-  segments.pop()
-  return segments.join('/') || null
+function safeResolveVaultAsset(vaultDir: string, requestPath: string) {
+  return safeResolve(vaultDir, requestPath)
 }
 
 function guessMimeType(path: string) {
   const lower = path.toLowerCase()
   if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
   if (lower.endsWith('.gif')) return 'image/gif'
   if (lower.endsWith('.webp')) return 'image/webp'
   if (lower.endsWith('.svg')) return 'image/svg+xml'
@@ -80,81 +87,59 @@ function guessMimeType(path: string) {
   return 'application/octet-stream'
 }
 
-function safeResolveVaultFile(vaultDir: string, requestPath: string): SafeVaultFile | null {
-  const normalized = normalizeVaultRelativePath(requestPath)
-  if (!normalized || normalized.includes('..')) {
-    return null
-  }
-
-  const absolutePath = resolve(vaultDir, normalized)
-  const relativeToVault = relative(vaultDir, absolutePath)
-  if (relativeToVault.startsWith('..') || relativeToVault === '' && normalized === '') {
-    return null
-  }
-
-  return {
-    absolutePath,
-    mimeType: guessMimeType(absolutePath)
-  }
+function sendJson(res: ServerResponse, statusCode: number, payload: unknown) {
+  res.statusCode = statusCode
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(payload))
 }
 
-async function readVaultDocuments(vaultDir: string): Promise<VaultManifest> {
-  const documents: VaultManifestDocument[] = []
-  const folderPaths = new Set<string>()
+function sendText(res: ServerResponse, statusCode: number, text: string) {
+  res.statusCode = statusCode
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.end(text)
+}
 
-  async function walk(relativeDir: string) {
-    const absoluteDir = resolve(vaultDir, relativeDir)
-    const entries = await readdir(absoluteDir, { withFileTypes: true })
-    entries.sort((left, right) => {
-      if (left.isDirectory() !== right.isDirectory()) {
-        return left.isDirectory() ? -1 : 1
+function sendNoContent(res: ServerResponse) {
+  res.statusCode = 204
+  res.end()
+}
+
+function readRequestBody(req: IncomingMessage) {
+  return new Promise<string>((resolveBody, rejectBody) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => resolveBody(Buffer.concat(chunks).toString('utf8')))
+    req.on('error', rejectBody)
+  })
+}
+
+function toPayloadPath(parentPath: string, name: string) {
+  return normalizeLocalPath(join(parentPath, name))
+}
+
+async function listDirPayload(localPath: SafeLocalPath) {
+  const entries = await readdir(localPath.absolutePath, { withFileTypes: true })
+  return entries
+    .map((entry) => ({
+      name: entry.name,
+      path: toPayloadPath(localPath.payloadRelativePath, entry.name),
+      isDir: entry.isDirectory()
+    }))
+    .sort((left, right) => {
+      if (left.isDir !== right.isDir) {
+        return left.isDir ? -1 : 1
       }
       return left.name.localeCompare(right.name, 'zh-Hans-CN')
     })
+}
 
-    let documentOrder = 0
-    for (const entry of entries) {
-      const nextRelative = normalizeVaultRelativePath(join(relativeDir, entry.name))
-      if (entry.isDirectory()) {
-        if (IGNORED_FOLDER_NAMES.has(entry.name.toLowerCase()) || entry.name.startsWith('.')) {
-          continue
-        }
-
-        folderPaths.add(nextRelative)
-        await walk(nextRelative)
-        continue
-      }
-
-      if (!entry.name.toLowerCase().endsWith('.md')) {
-        continue
-      }
-
-      const absolutePath = resolve(vaultDir, nextRelative)
-      const contentMd = await readFile(absolutePath, 'utf8')
-      documents.push({
-        path: nextRelative,
-        title: basenameFromPath(stripMarkdownExtension(nextRelative)),
-        parentPath: dirnameFromPath(nextRelative),
-        order: documentOrder++,
-        level: nextRelative.split('/').length,
-        contentMd,
-        contentVersion: createHash('sha1').update(contentMd).digest('hex').slice(0, 12),
-        contentPlainText: contentMd
-      })
-    }
-  }
-
-  await walk('')
-
-  documents.sort((left, right) => left.path.localeCompare(right.path, 'zh-Hans-CN'))
-
-  return {
-    vaultName: basenameFromPath(vaultDir) || 'AnyReader Vault',
-    vaultDir,
-    generatedAt: new Date().toISOString(),
-    documents,
-    folderPaths: [...folderPaths].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
-  }
+async function moveStatePathToTrash(localPath: SafeLocalPath, stateDir: string) {
+  await stat(localPath.absolutePath)
+  const fileName = basename(localPath.payloadRelativePath) || 'entry'
+  const trashDir = resolve(stateDir, 'trash')
+  const trashPath = resolve(trashDir, `${Date.now()}-${fileName}`)
+  await mkdir(trashDir, { recursive: true })
+  await rename(localPath.absolutePath, trashPath)
 }
 
 async function copyVaultToDist(vaultDir: string, distDir: string) {
@@ -176,81 +161,181 @@ async function copyVaultToDist(vaultDir: string, distDir: string) {
   await walkCopy(vaultDir, join(distDir, 'vault'))
 }
 
-function vaultPlugin(): Plugin {
-  const vaultDir = process.env.ANY_READER_VAULT_DIR ? resolve(process.env.ANY_READER_VAULT_DIR) : DEFAULT_VAULT_DIR
+function localFilePlugin(): Plugin {
   let rootDir = process.cwd()
   let outDir = 'dist'
+  let vaultDir = process.env.ANY_READER_VAULT_DIR
+    ? resolve(process.env.ANY_READER_VAULT_DIR)
+    : resolve(rootDir, DEFAULT_VAULT_DIR_NAME)
+  let stateDir = process.env.ANY_READER_DATA_DIR
+    ? resolve(process.env.ANY_READER_DATA_DIR)
+    : resolve(rootDir, LOCAL_STATE_DIR_NAME)
+
+  async function handleLocalRequest(req: IncomingMessage, res: ServerResponse, next: () => void) {
+    const url = req.url ? new URL(req.url, 'http://localhost') : null
+    if (!url) {
+      next()
+      return
+    }
+
+    if (url.pathname.startsWith(VAULT_ROUTE_PREFIX)) {
+      const requestPath = decodeURIComponent(url.pathname.slice(VAULT_ROUTE_PREFIX.length))
+      const absolutePath = safeResolveVaultAsset(vaultDir, requestPath)
+      if (!absolutePath) {
+        sendText(res, 404, 'Not found')
+        return
+      }
+
+      try {
+        if (req.method === 'HEAD') {
+          await stat(absolutePath)
+          res.statusCode = 200
+          res.setHeader('Content-Type', guessMimeType(absolutePath))
+          res.end()
+          return
+        }
+
+        const contents = await readFile(absolutePath)
+        res.statusCode = 200
+        res.setHeader('Content-Type', guessMimeType(absolutePath))
+        res.end(contents)
+      } catch (error) {
+        sendText(res, 404, error instanceof Error ? error.message : 'Not found')
+      }
+      return
+    }
+
+    if (!url.pathname.startsWith(LOCAL_API_ROUTE_PREFIX)) {
+      next()
+      return
+    }
+
+    const route = url.pathname.slice(LOCAL_API_ROUTE_PREFIX.length)
+    const requestPath = url.searchParams.get('path') ?? ''
+
+    try {
+      if (route === 'list' && req.method === 'GET') {
+        const localPath = resolveApiPath({ requestPath, stateDir, vaultDir })
+        if (!localPath) {
+          sendText(res, 404, 'Not found')
+          return
+        }
+        try {
+          sendJson(res, 200, await listDirPayload(localPath))
+        } catch (error) {
+          if (localPath.kind === 'state' && error instanceof Error && /ENOENT|ENOTDIR/.test(error.message)) {
+            sendJson(res, 200, [])
+            return
+          }
+          throw error
+        }
+        return
+      }
+
+      if (route === 'text' && req.method === 'GET') {
+        const localPath = resolveApiPath({ requestPath, stateDir, vaultDir })
+        if (!localPath) {
+          sendText(res, 404, 'Not found')
+          return
+        }
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+        res.end(await readFile(localPath.absolutePath, 'utf8'))
+        return
+      }
+
+      if (route === 'binary' && req.method === 'GET') {
+        const localPath = resolveApiPath({ requestPath, stateDir, vaultDir })
+        if (!localPath) {
+          sendText(res, 404, 'Not found')
+          return
+        }
+        const contents = await readFile(localPath.absolutePath)
+        res.statusCode = 200
+        res.setHeader('Content-Type', guessMimeType(localPath.absolutePath))
+        res.end(contents)
+        return
+      }
+
+      if (route === 'text' && req.method === 'PUT') {
+        const localPath = resolveApiPath({ requestPath, stateDir, vaultDir, forWrite: true })
+        if (!localPath) {
+          sendText(res, 403, 'Writes are limited to the local state directory')
+          return
+        }
+        await mkdir(dirname(localPath.absolutePath), { recursive: true })
+        await writeFile(localPath.absolutePath, await readRequestBody(req), 'utf8')
+        sendNoContent(res)
+        return
+      }
+
+      if (route === 'path' && req.method === 'DELETE') {
+        const localPath = resolveApiPath({ requestPath, stateDir, vaultDir, forWrite: true })
+        if (!localPath) {
+          sendText(res, 403, 'Deletes are limited to the local state directory')
+          return
+        }
+        await rm(localPath.absolutePath, { recursive: true, force: true })
+        sendNoContent(res)
+        return
+      }
+
+      if (route === 'trash' && req.method === 'POST') {
+        const payload = JSON.parse((await readRequestBody(req)) || '{}') as { path?: string }
+        const localPath = resolveApiPath({ requestPath: payload.path ?? '', stateDir, vaultDir, forWrite: true })
+        if (!localPath) {
+          sendText(res, 403, 'Trash moves are limited to the local state directory')
+          return
+        }
+        await moveStatePathToTrash(localPath, stateDir)
+        sendNoContent(res)
+        return
+      }
+
+      sendText(res, 404, 'Unknown local file route')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Local file request failed'
+      sendText(res, /ENOENT/.test(message) ? 404 : 500, message)
+    }
+  }
 
   return {
-    name: 'any-reader-ui-vault',
+    name: 'any-reader-ui-local-files',
     configResolved(config) {
       rootDir = config.root
       outDir = config.build.outDir
+      vaultDir = process.env.ANY_READER_VAULT_DIR
+        ? resolve(process.env.ANY_READER_VAULT_DIR)
+        : resolve(rootDir, DEFAULT_VAULT_DIR_NAME)
+      stateDir = process.env.ANY_READER_DATA_DIR
+        ? resolve(process.env.ANY_READER_DATA_DIR)
+        : resolve(rootDir, LOCAL_STATE_DIR_NAME)
     },
     configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        const url = req.url ? new URL(req.url, 'http://localhost') : null
-        if (!url) {
-          next()
-          return
-        }
-
-        if (url.pathname === VAULT_MANIFEST_ROUTE) {
-          try {
-            const manifest = await readVaultDocuments(vaultDir)
-            const body = JSON.stringify(manifest, null, 2)
-            res.statusCode = 200
-            res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(body)
-          } catch (error) {
-            res.statusCode = 500
-            res.setHeader('Content-Type', 'application/json; charset=utf-8')
-            res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to read vault' }))
-          }
-          return
-        }
-
-        if (!url.pathname.startsWith(VAULT_ROUTE_PREFIX)) {
-          next()
-          return
-        }
-
-        const requestPath = decodeURIComponent(url.pathname.slice(VAULT_ROUTE_PREFIX.length))
-        const file = safeResolveVaultFile(vaultDir, requestPath)
-        if (!file) {
-          res.statusCode = 404
-          res.end('Not found')
-          return
-        }
-
-        try {
-          const contents = await readFile(file.absolutePath)
-          res.statusCode = 200
-          res.setHeader('Content-Type', file.mimeType)
-          res.end(contents)
-        } catch (error) {
-          res.statusCode = 404
-          res.end(error instanceof Error ? error.message : 'Not found')
-        }
+      server.middlewares.use((req, res, next) => {
+        void handleLocalRequest(req, res, next)
+      })
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleLocalRequest(req, res, next)
       })
     },
     async writeBundle() {
-      const manifest = await readVaultDocuments(vaultDir)
       const distDir = resolve(rootDir, outDir)
       await mkdir(distDir, { recursive: true })
-      await writeFile(join(distDir, 'vault-manifest.json'), JSON.stringify(manifest, null, 2), 'utf8')
       await copyVaultToDist(vaultDir, distDir)
     }
   }
 }
 
 export default defineConfig({
-  plugins: [react(), vaultPlugin()],
+  plugins: [react(), localFilePlugin()],
   clearScreen: false,
   server: {
     host: '127.0.0.1',
     port: 1420,
-    strictPort: true
+    strictPort: false
   },
   build: {
     target: ['es2022', 'chrome105', 'safari13'],

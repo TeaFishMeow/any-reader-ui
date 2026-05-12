@@ -1,0 +1,84 @@
+{
+  "layout": {
+    "leftSidebarCollapsed": false,
+    "rightSidebarCollapsed": false,
+    "leftSidebarWidth": 280,
+    "rightSidebarWidth": 420,
+    "leftSidebarMinWidth": 220,
+    "rightSidebarMinWidth": 220,
+    "collapsedRailWidth": 36,
+    "rememberLayout": true
+  },
+  "askMenu": {
+    "maxVisibleTemplates": 6
+  },
+  "navigation": {
+    "collapsedSidebarFolderIds": [],
+    "readerScrollPositions": {}
+  },
+  "context": {
+    "defaultMode": "section",
+    "viewportRangeBlocks": 2,
+    "widgetDefaultMode": "widget-local"
+  },
+  "rendering": {
+    "readerFontPx": 16,
+    "widgetFontPx": 16,
+    "shortSelectionCharThreshold": 56
+  },
+  "storage": {
+    "mode": "local-first-files",
+    "autoSaveMs": 450
+  },
+  "shortcuts": {
+    "toggleLeft": "f",
+    "toggleRight": "v",
+    "openContext": "c"
+  },
+  "learning": {
+    "prompt": ""
+  },
+  "provider": {
+    "baseUrl": "",
+    "apiKey": "",
+    "model": "gpt-4.1-mini",
+    "temperature": 0.3
+  },
+  "repository": {
+    "sourceMode": "mounted-vault",
+    "mountedVaultPath": "微积分二层次下",
+    "lastOpenedDocumentPath": "第10章 重积分/10.2 二重积分的计算，曲面的面积/10.2.1 利用直角坐标计算二重积分.md"
+  },
+  "templates": [
+    {
+      "id": "template-solve",
+      "title": "解题",
+      "body": "按照例题的格式完成这道题。",
+      "color": "#B84D20",
+      "order": 0,
+      "isBuiltIn": true,
+      "isEnabled": true,
+      "scope": "global"
+    },
+    {
+      "id": "template-variable-meaning",
+      "title": "变量含义",
+      "body": "给出这个变量的元素类型、含义、功能。",
+      "color": "#0B6E4F",
+      "order": 1,
+      "isBuiltIn": true,
+      "isEnabled": true,
+      "scope": "global"
+    },
+    {
+      "id": "template-why",
+      "title": "为什么",
+      "body": "解释选中部分为什么是对的。",
+      "color": "#4A5568",
+      "order": 2,
+      "isBuiltIn": true,
+      "isEnabled": true,
+      "scope": "global"
+    }
+  ]
+}

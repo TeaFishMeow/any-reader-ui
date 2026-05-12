@@ -18,6 +18,9 @@ const LEGACY_BUILT_IN_TEMPLATE_IDS = new Set([
 
 export const DEMO_REPO_ID = 'demo-calculus'
 export const MAIN_CANVAS_ID = 'main'
+export const LOCAL_MOUNTED_VAULT_PATH = '微积分二层次下'
+export const LOCAL_DEFAULT_DOCUMENT_PATH =
+  '第10章 重积分/10.2 二重积分的计算，曲面的面积/10.2.1 利用直角坐标计算二重积分.md'
 
 export const demoDocuments: Array<{
   catalog: DocumentCatalogEntry
@@ -302,11 +305,11 @@ export function defaultAppConfig(): AppConfig {
       temperature: 0.3
     },
     repository: {
-      sourceMode: 'demo',
+      sourceMode: 'mounted-vault',
       libraryId: undefined,
       revisionId: undefined,
-      mountedVaultPath: undefined,
-      lastOpenedDocumentPath: demoRepoMeta.currentDocumentId
+      mountedVaultPath: LOCAL_MOUNTED_VAULT_PATH,
+      lastOpenedDocumentPath: LOCAL_DEFAULT_DOCUMENT_PATH
     },
     templates: applyPromptTemplateDefaults()
   }

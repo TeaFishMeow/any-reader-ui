@@ -1,8 +1,7 @@
 import type { DirEntryPayload } from '../types/domain'
 
-const STORAGE_PREFIX = 'anyreader-dev-fs:'
-const ROOT_KEY = `${STORAGE_PREFIX}root`
-const LOCAL_BROWSER_VAULT_PATH = 'any-reader-ui-local-vault'
+const LOCAL_API_PREFIX = '/__any-reader-local'
+const VAULT_ASSET_PREFIX = '/vault'
 const mountedVaultBlobUrlCache = new Map<string, string>()
 let tauriCorePromise: Promise<typeof import('@tauri-apps/api/core')> | null = null
 
@@ -23,94 +22,112 @@ function normalizeRelativePath(relativePath: string) {
   return relativePath.replace(/\\/g, '/').replace(/^\/+/, '')
 }
 
+function joinLocalPath(...parts: Array<string | undefined>) {
+  return parts
+    .map((part) => normalizeRelativePath(part ?? ''))
+    .filter(Boolean)
+    .join('/')
+}
+
+function localApiUrl(route: string, relativePath: string) {
+  const params = new URLSearchParams({ path: normalizeRelativePath(relativePath) })
+  return `${LOCAL_API_PREFIX}/${route}?${params.toString()}`
+}
+
 function encodeVaultAssetUrl(relativePath: string) {
-  return `/vault/${normalizeRelativePath(relativePath)
+  return `${VAULT_ASSET_PREFIX}/${normalizeRelativePath(relativePath)
     .split('/')
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join('/')}`
 }
 
-function isLocalBrowserVault(vaultPath?: string) {
-  return !isTauriRuntime() && (!vaultPath || vaultPath === LOCAL_BROWSER_VAULT_PATH)
+async function readErrorText(response: Response) {
+  const text = await response.text().catch(() => '')
+  return text.trim() || `Local file request failed with ${response.status}`
+}
+
+async function fetchTextOrNull(url: string) {
+  const response = await fetch(url)
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
+  return response.text()
+}
+
+async function fetchJson<T>(url: string) {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
+  return (await response.json()) as T
 }
 
 async function browserGetDataRoot() {
-  const existing = window.localStorage.getItem(ROOT_KEY)
-  if (existing) {
-    return existing
-  }
-  const root = 'browser://anyreader-data'
-  window.localStorage.setItem(ROOT_KEY, root)
-  return root
+  return 'any-reader-data'
 }
 
 async function browserRead(relativePath: string) {
-  return window.localStorage.getItem(`${STORAGE_PREFIX}${normalizeRelativePath(relativePath)}`)
+  return fetchTextOrNull(localApiUrl('text', relativePath))
 }
 
 async function browserWrite(relativePath: string, contents: string) {
-  window.localStorage.setItem(`${STORAGE_PREFIX}${normalizeRelativePath(relativePath)}`, contents)
+  const response = await fetch(localApiUrl('text', relativePath), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8'
+    },
+    body: contents
+  })
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
 }
 
 async function browserExists(relativePath: string) {
-  return window.localStorage.getItem(`${STORAGE_PREFIX}${normalizeRelativePath(relativePath)}`) !== null
+  const response = await fetch(localApiUrl('text', relativePath))
+  if (response.status === 404) {
+    return false
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
+  return true
 }
 
 async function browserList(relativePath: string) {
-  const prefix = normalizeRelativePath(relativePath)
-  const normalizedPrefix = prefix.length > 0 ? `${prefix}/` : ''
-  const keys = Object.keys(window.localStorage)
-  const children = new Map<string, DirEntryPayload>()
-
-  for (const key of keys) {
-    if (!key.startsWith(STORAGE_PREFIX)) {
-      continue
-    }
-
-    const relative = key.slice(STORAGE_PREFIX.length)
-    if (!relative.startsWith(normalizedPrefix)) {
-      continue
-    }
-
-    const remainder = relative.slice(normalizedPrefix.length)
-    if (!remainder) {
-      continue
-    }
-
-    const [head, ...rest] = remainder.split('/')
-    children.set(head, {
-      name: head,
-      path: `${normalizedPrefix}${head}`.replace(/\/$/, ''),
-      isDir: rest.length > 0
-    })
+  const response = await fetch(localApiUrl('list', relativePath))
+  if (response.status === 404) {
+    return [] as DirEntryPayload[]
   }
-
-  return [...children.values()].sort((left, right) => left.name.localeCompare(right.name))
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
+  return (await response.json()) as DirEntryPayload[]
 }
 
 async function browserMoveToTrash(relativePath: string) {
-  const normalized = normalizeRelativePath(relativePath)
-  const value = await browserRead(normalized)
-  if (value === null) {
-    return
+  const response = await fetch(`${LOCAL_API_PREFIX}/trash`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ path: normalizeRelativePath(relativePath) })
+  })
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await readErrorText(response))
   }
-  const fileName = normalized.split('/').pop() ?? 'entry.json'
-  const trashPath = `trash/${Date.now()}-${fileName}`
-  await browserWrite(trashPath, value)
-  window.localStorage.removeItem(`${STORAGE_PREFIX}${normalized}`)
 }
 
 async function browserRemove(relativePath: string) {
-  const normalized = normalizeRelativePath(relativePath)
-  const exactKey = `${STORAGE_PREFIX}${normalized}`
-  const prefixKey = `${exactKey}/`
-  const keys = Object.keys(window.localStorage)
-
-  for (const key of keys) {
-    if (key === exactKey || key.startsWith(prefixKey)) {
-      window.localStorage.removeItem(key)
-    }
+  const response = await fetch(localApiUrl('path', relativePath), {
+    method: 'DELETE'
+  })
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await readErrorText(response))
   }
 }
 
@@ -118,34 +135,34 @@ async function browserPickVaultDirectory() {
   return null
 }
 
-async function browserMountedVaultExists(_vaultPath?: string, _relativePath?: string) {
+async function browserMountedVaultExists(vaultPath: string, relativePath = '') {
+  const response = await fetch(localApiUrl('list', joinLocalPath(vaultPath, relativePath)))
+  if (response.status === 404) {
+    return false
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorText(response))
+  }
   return true
 }
 
-async function browserReadMountedVaultTextFile(_vaultPath?: string, relativePath?: string) {
-  if (!relativePath) {
-    return null
-  }
-
-  const response = await fetch(encodeVaultAssetUrl(relativePath))
-  return response.ok ? response.text() : null
+async function browserReadMountedVaultTextFile(vaultPath: string, relativePath: string) {
+  return fetchTextOrNull(localApiUrl('text', joinLocalPath(vaultPath, relativePath)))
 }
 
-async function browserReadMountedVaultBinaryFile(_vaultPath?: string, relativePath?: string) {
-  if (!relativePath) {
+async function browserReadMountedVaultBinaryFile(vaultPath: string, relativePath: string) {
+  const response = await fetch(localApiUrl('binary', joinLocalPath(vaultPath, relativePath)))
+  if (response.status === 404) {
     return null
   }
-
-  const response = await fetch(encodeVaultAssetUrl(relativePath))
   if (!response.ok) {
-    return null
+    throw new Error(await readErrorText(response))
   }
-
   return [...new Uint8Array(await response.arrayBuffer())]
 }
 
-async function browserListMountedVaultEntries(_vaultPath?: string, _relativePath?: string) {
-  return [] as DirEntryPayload[]
+async function browserListMountedVaultEntries(vaultPath: string, relativePath = '') {
+  return fetchJson<DirEntryPayload[]>(localApiUrl('list', joinLocalPath(vaultPath, relativePath)))
 }
 
 async function browserResolveMountedVaultAbsolutePath(_vaultPath?: string, _relativePath?: string) {
@@ -210,42 +227,45 @@ export async function pickVaultDirectory() {
 
 export async function mountedVaultExists(vaultPath: string, relativePath = '') {
   if (!isTauriRuntime()) {
-    return browserMountedVaultExists()
+    return browserMountedVaultExists(vaultPath, relativePath)
   }
   return invokeTauri<boolean>('mounted_vault_exists', { vaultPath, relativePath })
 }
 
 export async function readMountedVaultTextFile(vaultPath: string, relativePath: string) {
   if (!isTauriRuntime()) {
-    return browserReadMountedVaultTextFile()
+    return browserReadMountedVaultTextFile(vaultPath, relativePath)
   }
   return invokeTauri<string | null>('read_mounted_vault_text_file', { vaultPath, relativePath })
 }
 
 export async function readMountedVaultBinaryFile(vaultPath: string, relativePath: string) {
   if (!isTauriRuntime()) {
-    return browserReadMountedVaultBinaryFile()
+    return browserReadMountedVaultBinaryFile(vaultPath, relativePath)
   }
   return invokeTauri<number[] | null>('read_mounted_vault_binary_file', { vaultPath, relativePath })
 }
 
 export async function listMountedVaultEntries(vaultPath: string, relativePath = '') {
   if (!isTauriRuntime()) {
-    return browserListMountedVaultEntries()
+    return browserListMountedVaultEntries(vaultPath, relativePath)
   }
   return invokeTauri<DirEntryPayload[]>('list_mounted_vault_entries', { vaultPath, relativePath })
 }
 
 export async function resolveMountedVaultAbsolutePath(vaultPath: string, relativePath: string) {
   if (!isTauriRuntime()) {
-    return browserResolveMountedVaultAbsolutePath()
+    return browserResolveMountedVaultAbsolutePath(vaultPath, relativePath)
   }
   return invokeTauri<string | null>('resolve_mounted_vault_absolute_path', { vaultPath, relativePath })
 }
 
 export async function resolveMountedVaultAssetUrl(vaultPath: string, relativePath: string) {
-  if (isLocalBrowserVault(vaultPath)) {
-    return encodeVaultAssetUrl(relativePath)
+  if (!isTauriRuntime()) {
+    void vaultPath
+    const url = encodeVaultAssetUrl(relativePath)
+    const response = await fetch(url, { method: 'HEAD' })
+    return response.ok ? url : null
   }
 
   const cacheKey = `${vaultPath}::${normalizeRelativePath(relativePath)}`
