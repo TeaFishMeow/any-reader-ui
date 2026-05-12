@@ -1,0 +1,28 @@
+{
+  "id": "./",
+  "name": "十二问 AnyReader",
+  "short_name": "十二问 AnyReader",
+  "description": "Install AnyReader to keep your reading workspace, annotations, and library tools close at hand.",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "display": "standalone",
+  "orientation": "any",
+  "start_url": "./",
+  "scope": "./",
+  "theme_color": "#f7f2e8",
+  "background_color": "#efe6d8",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

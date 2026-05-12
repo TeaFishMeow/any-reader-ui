@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="anyreader-favicon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c25d2d" />
+      <stop offset="100%" stop-color="#7e3110" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#anyreader-favicon-gradient)" />
+  <path
+    d="M18 18h12c4.4 0 8 3.6 8 8v20c-1.9-2.2-4.7-3.5-7.7-3.5H18V18Zm28 0H34v24.5h12.3c3 0 5.8 1.3 7.7 3.5V26c0-4.4-3.6-8-8-8Z"
+    fill="#fff7ef"
+  />
+  <path
+    d="M32 18v24.5"
+    stroke="#f5dccd"
+    stroke-linecap="round"
+    stroke-width="2.5"
+  />
+</svg>

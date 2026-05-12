@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.codex-run/
+.vite/
+*.local
+.DS_Store
+Thumbs.db
