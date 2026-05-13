@@ -5,8 +5,6 @@ import { clamp, createId, makeSummary, truncateText } from '../lib/text'
 import { sortTemplates } from '../lib/app-helpers'
 import { contextModeLabelKey, resolveQaRecordDisplayTitle } from '../i18n/messages'
 import { useI18n } from '../i18n/useI18n'
-import { useAuthSession } from '../lib/auth-session'
-import { buildLoginPath } from '../lib/web-routing'
 import type {
   PendingAskSession,
   PromptTemplate,
@@ -601,7 +599,6 @@ interface GlobalSettingsModalProps {
 
 export function GlobalSettingsModal({ repositoryBinding, onClose, onReloadWorkspace }: GlobalSettingsModalProps) {
   const { t } = useI18n()
-  const auth = useAuthSession()
   const currentModeLabel =
     repositoryBinding.activeSourceMode === 'remote-library'
       ? t('chrome.workspaceSettings.mode.remote')
@@ -613,16 +610,6 @@ export function GlobalSettingsModal({ repositoryBinding, onClose, onReloadWorksp
       ? `${repositoryBinding.libraryId} @ ${repositoryBinding.revisionId}`
       : repositoryBinding.libraryId
     : t('chrome.workspaceSettings.notBoundYet')
-
-  async function handleSignOut() {
-    try {
-      await auth.signOut()
-    } catch (error) {
-      console.error(error)
-    } finally {
-      window.location.replace(buildLoginPath(`${window.location.pathname}${window.location.search}`))
-    }
-  }
 
   return (
     <ModalShell title={t('chrome.workspaceSettings.title')} onClose={onClose}>
@@ -647,28 +634,6 @@ export function GlobalSettingsModal({ repositoryBinding, onClose, onReloadWorksp
           <p className="modal-note">{t('chrome.workspaceSettings.remoteWorkspaceNote')}</p>
           <button className="ghost-button small settings-action" onClick={() => void onReloadWorkspace()}>
             {t('chrome.workspaceSettings.reloadWorkspace')}
-          </button>
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <strong>{t('chrome.workspaceSettings.section.llmAccess')}</strong>
-        <p className="modal-note">{t('chrome.workspaceSettings.llmAccessNote')}</p>
-      </div>
-
-      <div className="settings-section">
-        <strong>{t('chrome.workspaceSettings.section.account')}</strong>
-        <div className="settings-list">
-          <label className="settings-row">
-            <span>{t('chrome.workspaceSettings.status')}</span>
-            <input value={auth.status === 'signed_in' ? t('chrome.workspaceSettings.statusSignedIn') : auth.status} readOnly />
-          </label>
-          <label className="settings-row">
-            <span>{t('chrome.workspaceSettings.email')}</span>
-            <input value={auth.user?.email ?? t('shared.unknownUser')} readOnly />
-          </label>
-          <button className="ghost-button small settings-action" onClick={() => void handleSignOut()}>
-            {t('shared.action.signOut')}
           </button>
         </div>
       </div>

@@ -680,7 +680,6 @@ export function App() {
       previewText: preview.readingContext
     }
   }, [askMenu, canvas, config, contextModalTarget, documents, nextAskContextMode, repo, t])
-  const isDemoRepo = repositoryBinding?.activeSourceMode === 'demo'
   const isRemoteRepo = repositoryBinding?.activeSourceMode === 'remote-library'
   const mountedVaultPath = repositoryBinding?.activeSourceMode === 'mounted-vault' ? repositoryBinding.mountedVaultPath : undefined
   const remoteLibraryId = isRemoteRepo ? repositoryBinding?.libraryId ?? repo?.libraryId : undefined
@@ -2163,8 +2162,8 @@ export function App() {
       {isMobilePortraitLayout ? (
         <header className="app-topbar app-topbar--mobile-portrait">
           <div className="mobile-pane-switcher" role="group" aria-label={t('app.mobilePaneSwitcher.label')}>
-            <button
-              type="button"
+                  <button
+                    type="button"
               className={`mobile-pane-switcher__button${mobilePortraitPane === 'left' ? ' is-active' : ''}`}
               aria-pressed={mobilePortraitPane === 'left'}
               onClick={() => selectMobilePortraitPane('left')}
@@ -2295,27 +2294,19 @@ export function App() {
           />
         ) : (
           <aside className={`workspace-pane sidebar left-pane${leftPaneMobileClass}`}>
-            <button
-              type="button"
-              className="panel-minimize-button"
-              aria-label={t('app.a11y.collapseLeftSidebar')}
-              onClick={() => setLeftSidebarCollapsed(true)}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <div className="sidebar-brand">
-              <span className="topbar-mark">十二问 AnyReader</span>
-              <div className="topbar-copy">
-                <div className="topbar-title-row">
-                  <strong>{repo.title}</strong>
-                  <span className={`demo-badge ${isDemoRepo ? '' : 'mounted-badge'}`}>
-                    {isDemoRepo
-                      ? t('app.header.source.demo')
-                      : isRemoteRepo
-                        ? t('app.header.source.remote')
-                        : t('app.header.source.mounted')}
-                  </span>
-                </div>
+            <div className="panel-header">
+              <div className="panel-heading">
+                <strong>十二问 AnyReader</strong>
+              </div>
+              <div className="panel-actions">
+                <button
+                  type="button"
+                  className="panel-action-button"
+                  aria-label={t('app.a11y.collapseLeftSidebar')}
+                  onClick={() => setLeftSidebarCollapsed(true)}
+                >
+                  <span aria-hidden="true">−</span>
+                </button>
               </div>
             </div>
             <SidebarTree
@@ -2420,12 +2411,9 @@ export function App() {
                         setSettingsMenuOpen(false)
                         setModal('settings')
                       }}
-                    >
-                      {t('chrome.workspaceSettings.title')}
-                    </button>
-                    <a role="menuitem" href={librariesPath}>
-                      {t('shared.action.backToLibraries')}
-                    </a>
+                  >
+                    {t('chrome.workspaceSettings.title')}
+                  </button>
                   </div>
                 ) : null}
               </div>
@@ -2457,26 +2445,31 @@ export function App() {
             onPointerDown={() => setActiveFontPane('reader')}
             onWheelCapture={(event) => handlePaneFontWheel('reader', event)}
           >
-            <button
-              type="button"
-              className="panel-minimize-button reader-minimize-button"
-              aria-label={t('app.a11y.collapseReaderPane')}
-              onClick={() => {
-                setIsReaderFullscreen(false)
-                setRightSidebarCollapsed(true)
-              }}
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <button
-              type="button"
-              className="panel-fullscreen-button"
-              aria-label={isReaderFullscreen ? t('app.a11y.exitReaderFullscreen') : t('app.a11y.enterReaderFullscreen')}
-              aria-pressed={isReaderFullscreen}
-              onClick={() => setIsReaderFullscreen((fullscreen) => !fullscreen)}
-            >
-              <span aria-hidden="true">{isReaderFullscreen ? '□' : '▢'}</span>
-            </button>
+            <div className="panel-header reader-panel-header">
+              <div className="panel-heading" aria-hidden="true" />
+              <div className="panel-actions">
+                <button
+                  type="button"
+                  className="panel-action-button"
+                  aria-label={t('app.a11y.collapseReaderPane')}
+                  onClick={() => {
+                    setIsReaderFullscreen(false)
+                    setRightSidebarCollapsed(true)
+                  }}
+                >
+                  <span aria-hidden="true">−</span>
+                </button>
+                <button
+                  type="button"
+                  className="panel-action-button"
+                  aria-label={isReaderFullscreen ? t('app.a11y.exitReaderFullscreen') : t('app.a11y.enterReaderFullscreen')}
+                  aria-pressed={isReaderFullscreen}
+                  onClick={() => setIsReaderFullscreen((fullscreen) => !fullscreen)}
+                >
+                  <span aria-hidden="true">{isReaderFullscreen ? '□' : '▢'}</span>
+                </button>
+              </div>
+            </div>
             <div className="reader-scroll" ref={readerScrollRef} onScroll={handleReaderScroll}>
               {shouldRenderReaderTitle ? (
                 <header className="reader-article-header">
