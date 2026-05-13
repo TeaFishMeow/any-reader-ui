@@ -1057,7 +1057,7 @@ Object.assign(extraMessages['zh-CN'], {
   'app.mobilePaneSwitcher.label': '移动端栏位切换',
   'app.mobilePane.left': '目录',
   'app.mobilePane.reader': '阅读',
-  'app.mobilePane.right': '问答'
+  'app.mobilePane.right': '画布'
 })
 
 Object.assign(extraMessages['en-US'], {
@@ -1103,7 +1103,12 @@ Object.assign(extraMessages['zh-CN'], {
   'app.header.modelUnavailable': '未配置模型',
   'app.header.modelOption': '{model} / {cost} 积分',
   'app.header.creditsBalance': '积分余额 {count}',
-  'app.header.subscriptionCredits': '{tier}，额度 {credits}'
+  'app.header.subscriptionCredits': '{tier}，额度 {credits}',
+  'app.header.manageSubscription': '管理订阅',
+  'app.a11y.collapseLeftSidebar': '收起目录',
+  'app.a11y.collapseReaderPane': '收起正文',
+  'app.a11y.enterReaderFullscreen': '正文全屏',
+  'app.a11y.exitReaderFullscreen': '退出正文全屏'
 })
 
 Object.assign(extraMessages['en-US'], {
@@ -1111,7 +1116,12 @@ Object.assign(extraMessages['en-US'], {
   'app.header.modelUnavailable': 'No model configured',
   'app.header.modelOption': '{model} / {cost} credits',
   'app.header.creditsBalance': 'Credit balance {count}',
-  'app.header.subscriptionCredits': '{tier}, credits {credits}'
+  'app.header.subscriptionCredits': '{tier}, credits {credits}',
+  'app.header.manageSubscription': 'Manage subscription',
+  'app.a11y.collapseLeftSidebar': 'Collapse outline',
+  'app.a11y.collapseReaderPane': 'Collapse reader',
+  'app.a11y.enterReaderFullscreen': 'Fullscreen reader',
+  'app.a11y.exitReaderFullscreen': 'Exit reader fullscreen'
 })
 
 Object.assign(extraMessages['zh-CN'], {

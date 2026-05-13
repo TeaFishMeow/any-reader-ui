@@ -253,22 +253,6 @@ function formatLlmModelDisplayName(displayName: string | undefined, model: strin
   return trimmedDisplayName
 }
 
-function formatSubscriptionTierLabel(code: string | null | undefined) {
-  switch (code) {
-    case 'vip1':
-      return 'VIP1 小杯'
-    case 'vip2':
-      return 'VIP2 中杯'
-    case 'vip3':
-      return 'VIP3 大杯'
-    case 'vip4':
-      return 'VIP4 超大杯'
-    case 'free':
-    default:
-      return 'Free'
-  }
-}
-
 function FourPointStarIcon() {
   return (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -299,6 +283,9 @@ export function App() {
   const [nextAskContextMode, setNextAskContextMode] = useState<ReadingContextMode | null>(null)
   const [contextModalTarget, setContextModalTarget] = useState<ContextModalTarget>(null)
   const [modal, setModal] = useState<ModalName>(null)
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [isReaderFullscreen, setIsReaderFullscreen] = useState(false)
   const [groupChooser, setGroupChooser] = useState<GroupChooserState | null>(null)
   const [mobilePortraitPane, setMobilePortraitPane] = useState<MobilePortraitPane>('reader')
   const [quickErrataOpen, setQuickErrataOpen] = useState(false)
@@ -326,6 +313,8 @@ export function App() {
   })
   const activeRecordRunsRef = useRef(new Map<string, AbortController>())
   const workspaceRef = useRef<HTMLDivElement | null>(null)
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null)
+  const modelMenuRef = useRef<HTMLDivElement | null>(null)
   const readerScrollRef = useRef<HTMLDivElement | null>(null)
   const readerScrollPersistTimerRef = useRef<number | null>(null)
   const readerScrollWorkspacePersistTimerRef = useRef<number | null>(null)
@@ -359,7 +348,7 @@ export function App() {
   )
   const isLeftPaneCollapsed = config?.layout.leftSidebarCollapsed ?? false
   const isRightPaneCollapsed = config?.layout.rightSidebarCollapsed ?? true
-  const isRightPaneVisible = isMobilePortraitLayout ? mobilePortraitPane === 'right' : !isRightPaneCollapsed
+  const isCanvasPaneVisible = isMobilePortraitLayout ? mobilePortraitPane === 'right' : true
   const activeCanvasWidgetId = canvas?.selection?.widgetId ?? canvas?.widgetStates.at(-1)?.id ?? null
   const isCanvasViewportMeasured = canvasViewportSize.width > 0 && canvasViewportSize.height > 0
 
@@ -488,6 +477,8 @@ export function App() {
         setGroupChooser(null)
         setContextModalTarget(null)
         setModal(null)
+        setSettingsMenuOpen(false)
+        setModelMenuOpen(false)
         setQuickErrataOpen(false)
         setQuickErrataTarget(null)
       }
@@ -498,12 +489,30 @@ export function App() {
   }, [config, isLeftPaneCollapsed, isRightPaneCollapsed, askMenu, canvas, nextAskContextMode])
 
   useEffect(() => {
+    if (!settingsMenuOpen && !modelMenuOpen) {
+      return
+    }
+
+    const closeFloatingMenus = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (settingsMenuRef.current?.contains(target) || modelMenuRef.current?.contains(target)) {
+        return
+      }
+      setSettingsMenuOpen(false)
+      setModelMenuOpen(false)
+    }
+
+    window.addEventListener('pointerdown', closeFloatingMenus)
+    return () => window.removeEventListener('pointerdown', closeFloatingMenus)
+  }, [modelMenuOpen, settingsMenuOpen])
+
+  useEffect(() => {
     if (!canvas?.id) {
       rightPaneVisibilitySyncRef.current = null
       return
     }
 
-    if (!isRightPaneVisible || !activeCanvasWidgetId) {
+    if (!isCanvasPaneVisible || !activeCanvasWidgetId) {
       rightPaneVisibilitySyncRef.current = null
       return
     }
@@ -518,7 +527,7 @@ export function App() {
 
     rightPaneVisibilitySyncRef.current = syncKey
     ensureWidgetVisibleInCanvas(activeCanvasWidgetId)
-  }, [activeCanvasWidgetId, canvas?.id, isCanvasViewportMeasured, isMobilePortraitLayout, isRightPaneVisible])
+  }, [activeCanvasWidgetId, canvas?.id, isCanvasPaneVisible, isCanvasViewportMeasured, isMobilePortraitLayout])
 
   const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
   const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] : null
@@ -683,7 +692,6 @@ export function App() {
   const subscriptionPath = buildSubscriptionPath()
   const topbarModelValue = selectedLlmModel?.id ?? config?.provider.model ?? ''
   const topbarCreditBalance = llmAccess?.creditBalance ?? 0
-  const topbarSubscriptionLabel = formatSubscriptionTierLabel(llmAccess?.subscription?.effectiveTier)
   const topbarDailyRemaining = llmAccess?.dailyRemaining
   const topbarDailyQuota = llmAccess?.dailyQuota
   const topbarCreditSummary =
@@ -705,8 +713,13 @@ export function App() {
       config.layout.rightSidebarMinWidth,
       MAX_RIGHT_SIDEBAR_WIDTH
     )
+    const readerPanelWidth = clamp(
+      Math.max(rightSidebarWidth, 720),
+      Math.max(520, config.layout.rightSidebarMinWidth),
+      Math.min(MAX_RIGHT_SIDEBAR_WIDTH, Math.max(560, workspaceWidth - leftSidebarWidth - 96))
+    )
     const leftPaneWidth = isLeftPaneCollapsed ? config.layout.collapsedRailWidth : leftSidebarWidth
-    const rightPaneWidth = isRightPaneCollapsed ? config.layout.collapsedRailWidth : rightSidebarWidth
+    const rightPaneWidth = isRightPaneCollapsed ? config.layout.collapsedRailWidth : readerPanelWidth
     const leftSplitterWidth = isLeftPaneCollapsed ? 0 : WORKSPACE_SPLITTER_WIDTH
     const rightSplitterWidth = isRightPaneCollapsed ? 0 : WORKSPACE_SPLITTER_WIDTH
 
@@ -724,7 +737,7 @@ export function App() {
         '--right-splitter-size': `${rightSplitterWidth}px`
       } as CSSProperties
     }
-  }, [config, isLeftPaneCollapsed, isRightPaneCollapsed])
+  }, [config, isLeftPaneCollapsed, isRightPaneCollapsed, workspaceWidth])
 
   function clearWorkspacePersistTimer() {
     const pendingTimer = workspacePersistRef.current.timer
@@ -1161,7 +1174,7 @@ export function App() {
         }
       }
 
-      const nextWidget = ensureWidgetVisible(baseCanvas, widget, resolvedCanvasViewportSize)
+      const nextWidget = placeWidgetInExposedCanvasArea(baseCanvas, widget)
       if (sameWidgetGeometry(widget, nextWidget)) {
         return baseCanvas === draft ? draft : { ...baseCanvas, updatedAt: new Date().toISOString() }
       }
@@ -1181,7 +1194,9 @@ export function App() {
       expandRightSidebar()
     }
     updateCanvas((draft) => {
-      const widget = ensureWidgetVisible(draft, factory(draft), resolvedCanvasViewportSize)
+      const widget = isMobilePortraitLayout
+        ? ensureWidgetVisible(draft, factory(draft), resolvedCanvasViewportSize)
+        : placeWidgetInExposedCanvasArea(draft, factory(draft))
       return {
         ...draft,
         widgetStates: [...draft.widgetStates, widget],
@@ -1191,6 +1206,39 @@ export function App() {
         updatedAt: new Date().toISOString()
       }
     }, options)
+  }
+
+  function placeWidgetInExposedCanvasArea(draft: CanvasState, widget: WidgetState): WidgetState {
+    if (!layoutMetrics || workspaceWidth <= 0) {
+      return ensureWidgetVisible(draft, widget, resolvedCanvasViewportSize)
+    }
+
+    const viewport = normalizeCanvasViewport(draft.viewport)
+    const zoom = viewport.zoom
+    const leftChromeWidth = isLeftPaneCollapsed
+      ? layoutMetrics.leftPaneWidth
+      : layoutMetrics.leftPaneWidth + layoutMetrics.leftSplitterWidth
+    const readerChromeWidth = isRightPaneCollapsed
+      ? layoutMetrics.rightPaneWidth
+      : layoutMetrics.rightPaneWidth + layoutMetrics.rightSplitterWidth
+    const exposedLeft = Math.min(workspaceWidth - 80, leftChromeWidth + readerChromeWidth + 28)
+    const exposedWidth = Math.max(320, workspaceWidth - exposedLeft - 28)
+    const size = {
+      w: Math.min(widget.size.w, Math.max(320, exposedWidth)),
+      h: widget.size.h
+    }
+    const widgetIndex = draft.widgetStates.length % 6
+    const targetScreenX = exposedLeft + widgetIndex * 18
+    const targetScreenY = 56 + widgetIndex * 18
+
+    return {
+      ...widget,
+      size,
+      position: {
+        x: Math.round((targetScreenX - viewport.x) / zoom),
+        y: Math.round((targetScreenY - viewport.y) / zoom)
+      }
+    }
   }
 
   function focusWidget(widgetId: string, options?: { ensureVisible?: boolean }) {
@@ -1210,14 +1258,19 @@ export function App() {
 
       const nextZIndex = Math.max(0, ...draft.widgetStates.map((widget) => widget.zIndex)) + 1
       const maybeVisibleWidget = options?.ensureVisible
-        ? ensureWidgetVisible(
-            draft,
-            {
+        ? isMobilePortraitLayout
+          ? ensureWidgetVisible(
+              draft,
+              {
+                ...activeWidget,
+                zIndex: nextZIndex
+              },
+              resolvedCanvasViewportSize
+            )
+          : placeWidgetInExposedCanvasArea(draft, {
               ...activeWidget,
               zIndex: nextZIndex
-            },
-            resolvedCanvasViewportSize
-          )
+            })
         : null
       const widgetStates = draft.widgetStates.map((widget) => {
         if (widget.id !== widgetId) {
@@ -1489,7 +1542,7 @@ export function App() {
     }
 
     const startX = event.clientX
-    const originWidth = side === 'left' ? config.layout.leftSidebarWidth : config.layout.rightSidebarWidth
+    const originWidth = side === 'left' ? config.layout.leftSidebarWidth : (layoutMetrics?.rightPaneWidth ?? config.layout.rightSidebarWidth)
     const minWidth = side === 'left' ? config.layout.leftSidebarMinWidth : config.layout.rightSidebarMinWidth
     const otherPaneWidth =
       side === 'left'
@@ -1527,7 +1580,7 @@ export function App() {
 
     const move = (moveEvent: PointerEvent) => {
       const delta = moveEvent.clientX - startX
-      const proposedWidth = side === 'left' ? originWidth + delta : originWidth - delta
+      const proposedWidth = originWidth + delta
       const clampedWidth = clamp(proposedWidth, minWidth, maxWidth)
       lastRawWidth = proposedWidth
       lastClampedWidth = clampedWidth
@@ -2107,25 +2160,8 @@ export function App() {
 
   return (
     <div className={`app-shell${isMobilePortraitLayout ? ' app-shell--mobile-portrait' : ''}`}>
-      <header className={`app-topbar${isMobilePortraitLayout ? ' app-topbar--mobile-portrait' : ''}`}>
-        <div className="topbar-brand">
-          <span className="topbar-mark">十二问 AnyReader</span>
-          <div className="topbar-copy">
-            <div className="topbar-title-row">
-              <strong>{repo.title}</strong>
-              <span className={`demo-badge ${isDemoRepo ? '' : 'mounted-badge'}`}>
-                {isDemoRepo
-                  ? t('app.header.source.demo')
-                  : isRemoteRepo
-                    ? t('app.header.source.remote')
-                    : t('app.header.source.mounted')}
-              </span>
-            </div>
-            <span>{t('app.header.tagline')}</span>
-          </div>
-        </div>
-
-        {isMobilePortraitLayout ? (
+      {isMobilePortraitLayout ? (
+        <header className="app-topbar app-topbar--mobile-portrait">
           <div className="mobile-pane-switcher" role="group" aria-label={t('app.mobilePaneSwitcher.label')}>
             <button
               type="button"
@@ -2152,66 +2188,8 @@ export function App() {
               {t('app.mobilePane.right')}
             </button>
           </div>
-        ) : null}
-
-        <div className="topbar-actions">
-          <div className="topbar-llm-controls">
-            <label className="topbar-model-picker">
-              <span>{t('app.header.model')}</span>
-              <select
-                value={topbarModelValue}
-                disabled={!config || !llmAccess?.models.length}
-                onChange={(event) =>
-                  updateConfig((draft) => ({
-                    ...draft,
-                    provider: {
-                      ...draft.provider,
-                      model: event.target.value
-                    }
-                  }))
-                }
-              >
-                {llmAccess?.models.length ? (
-                  llmAccess.models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {t('app.header.modelOption', {
-                        model: formatLlmModelDisplayName(model.displayName, model.model),
-                        cost: model.cost
-                      })}
-                    </option>
-                  ))
-                ) : (
-                  <option value="">{t('app.header.modelUnavailable')}</option>
-                )}
-              </select>
-            </label>
-            <a
-              className="topbar-credit-pill topbar-credit-pill--subscription"
-              href={subscriptionPath}
-              aria-label={t('app.header.subscriptionCredits', { tier: topbarSubscriptionLabel, credits: topbarCreditSummary })}
-              title={t('app.header.subscriptionCredits', { tier: topbarSubscriptionLabel, credits: topbarCreditSummary })}
-            >
-              <span className="topbar-credit-icon">
-                <FourPointStarIcon />
-              </span>
-              <span>{topbarSubscriptionLabel}</span>
-              <strong>{topbarCreditSummary}</strong>
-            </a>
-          </div>
-          <a className="ghost-button" href={librariesPath}>
-            {t('shared.action.backToLibraries')}
-          </a>
-          <button className="ghost-button" onClick={() => setModal('templates')}>
-            {t('app.header.templates')}
-          </button>
-          <button className="ghost-button" onClick={openContextSettings}>
-            {t('app.header.context')}
-          </button>
-          <button className="ghost-button" onClick={() => setModal('settings')}>
-            {t('app.header.settings')}
-          </button>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
       {workspacePersistBanner ? (
         <section
@@ -2264,6 +2242,52 @@ export function App() {
       */}
 
       <div ref={workspaceRef} className="workspace-grid" style={layoutMetrics?.style}>
+        <section
+          className={`workspace-pane canvas-layer${rightPaneMobileClass}`}
+          onPointerEnter={() => setActiveFontPane('widget')}
+          onPointerDown={() => setActiveFontPane('widget')}
+          onWheelCapture={(event) => handlePaneFontWheel('widget', event)}
+        >
+          <Suspense fallback={null}>
+            <CanvasPane
+              canvas={canvas}
+              qaRecords={activeRecords}
+              config={config}
+              documents={documents}
+              mountedVaultPath={mountedVaultPath}
+              remoteLibraryId={remoteLibraryId}
+              remoteRevisionId={remoteRevisionId}
+              onCanvasChange={(nextCanvas) => {
+                setCanvas((previous) => {
+                  const resolved =
+                    typeof nextCanvas === 'function'
+                      ? (nextCanvas as (draft: CanvasState | null) => CanvasState | null)(previous)
+                      : nextCanvas
+                  const normalized = resolved ? normalizeCanvasState(resolved) : resolved
+                  canvasRef.current = normalized
+                  return normalized
+                })
+              }}
+              onWidgetFocus={focusWidget}
+              onWidgetChange={updateWidget}
+              onWidgetClose={closeWidget}
+              onAsk={openAskMenu}
+              onOpenContext={(widgetId) =>
+                setContextModalTarget({
+                  kind: 'ask-widget',
+                  widgetId
+                })
+              }
+              onSubmitCustom={submitCustomAsk}
+              onOpenRecord={openRecordWidget}
+              onOpenGroup={(recordIds, point) => setGroupChooser({ point, recordIds })}
+              onDeleteRecord={removeRecord}
+              onOpenDocument={openDocument}
+              onViewportSizeChange={setCanvasViewportSize}
+            />
+          </Suspense>
+        </section>
+
         {!isMobilePortraitLayout && isLeftPaneCollapsed ? (
           <CollapsedRail
             ariaLabel={t('app.a11y.expandLeftSidebar')}
@@ -2271,6 +2295,29 @@ export function App() {
           />
         ) : (
           <aside className={`workspace-pane sidebar left-pane${leftPaneMobileClass}`}>
+            <button
+              type="button"
+              className="panel-minimize-button"
+              aria-label={t('app.a11y.collapseLeftSidebar')}
+              onClick={() => setLeftSidebarCollapsed(true)}
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <div className="sidebar-brand">
+              <span className="topbar-mark">十二问 AnyReader</span>
+              <div className="topbar-copy">
+                <div className="topbar-title-row">
+                  <strong>{repo.title}</strong>
+                  <span className={`demo-badge ${isDemoRepo ? '' : 'mounted-badge'}`}>
+                    {isDemoRepo
+                      ? t('app.header.source.demo')
+                      : isRemoteRepo
+                        ? t('app.header.source.remote')
+                        : t('app.header.source.mounted')}
+                  </span>
+                </div>
+              </div>
+            </div>
             <SidebarTree
               repo={repo}
               nodes={sidebarNodes}
@@ -2281,6 +2328,108 @@ export function App() {
               onToggleFolder={toggleSidebarFolder}
               onAsk={openAskMenu}
             />
+            <div className="sidebar-controls">
+              <div className="model-menu-wrap" ref={modelMenuRef}>
+                <button
+                  type="button"
+                  className="model-menu-trigger"
+                  aria-expanded={modelMenuOpen}
+                  onClick={() => {
+                    setModelMenuOpen((open) => !open)
+                    setSettingsMenuOpen(false)
+                  }}
+                >
+                  <span className="topbar-credit-icon" aria-hidden="true">
+                    <FourPointStarIcon />
+                  </span>
+                  <span className="model-menu-trigger__main">{topbarCreditSummary}</span>
+                </button>
+                {modelMenuOpen ? (
+                  <div className="model-menu" role="menu">
+                    <span className="model-menu-heading">{t('app.header.model')}</span>
+                    {llmAccess?.models.length ? (
+                      llmAccess.models.map((model) => (
+                        <button
+                          key={model.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={model.id === topbarModelValue}
+                          className={`model-menu-item${model.id === topbarModelValue ? ' is-active' : ''}`}
+                          onClick={() => {
+                            setModelMenuOpen(false)
+                            updateConfig((draft) => ({
+                              ...draft,
+                              provider: {
+                                ...draft.provider,
+                                model: model.id
+                              }
+                            }))
+                          }}
+                        >
+                          <span>{formatLlmModelDisplayName(model.displayName, model.model)}</span>
+                          <small>{model.cost}</small>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="model-menu-empty">{t('app.header.modelUnavailable')}</span>
+                    )}
+                    <a className="model-menu-subscription" role="menuitem" href={subscriptionPath}>
+                      {t('app.header.manageSubscription')}
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+              <div className="settings-menu-wrap" ref={settingsMenuRef}>
+                <button
+                  type="button"
+                  className="ghost-button settings-menu-trigger"
+                  aria-expanded={settingsMenuOpen}
+                  onClick={() => {
+                    setSettingsMenuOpen((open) => !open)
+                    setModelMenuOpen(false)
+                  }}
+                >
+                  {t('app.header.settings')}
+                </button>
+                {settingsMenuOpen ? (
+                  <div className="settings-menu" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSettingsMenuOpen(false)
+                        setModal('templates')
+                      }}
+                    >
+                      {t('app.header.templates')}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSettingsMenuOpen(false)
+                        openContextSettings()
+                      }}
+                    >
+                      {t('app.header.context')}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSettingsMenuOpen(false)
+                        setModal('settings')
+                      }}
+                    >
+                      {t('chrome.workspaceSettings.title')}
+                    </button>
+                    <a role="menuitem" href={librariesPath}>
+                      {t('shared.action.backToLibraries')}
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </aside>
         )}
 
@@ -2295,39 +2444,67 @@ export function App() {
           />
         ) : null}
 
-        <main
-          className={`workspace-pane reader-pane${readerPaneMobileClass}`}
-          onPointerEnter={() => setActiveFontPane('reader')}
-          onPointerDown={() => setActiveFontPane('reader')}
-          onWheelCapture={(event) => handlePaneFontWheel('reader', event)}
-        >
-          <div className="reader-scroll" ref={readerScrollRef} onScroll={handleReaderScroll}>
-            {shouldRenderReaderTitle ? (
-              <header className="reader-article-header">
-                <h1 className="reader-article-title">{currentDocument.title.trim()}</h1>
-              </header>
-            ) : null}
-            <Suspense fallback={null}>
-              <MarkdownSurface
-                markdown={currentDocument.contentMd}
-                qaRecords={activeRecords}
-                config={config}
-                surface="reader"
-                documentId={currentDocument.id}
-                documentPath={currentDocument.path}
-                documents={documents}
-                mountedVaultPath={mountedVaultPath}
-                remoteLibraryId={remoteLibraryId}
-                remoteRevisionId={remoteRevisionId}
-                surfaceTitle={currentDocument.title}
-                onAsk={openAskMenu}
-                onOpenRecord={openRecordWidget}
-                onOpenGroup={(recordIds, point) => setGroupChooser({ point, recordIds })}
-                onOpenDocument={openDocument}
-              />
-            </Suspense>
-          </div>
-        </main>
+        {!isMobilePortraitLayout && isRightPaneCollapsed ? (
+          <CollapsedRail
+            side="left"
+            ariaLabel={t('app.mobilePane.reader')}
+            onClick={() => setRightSidebarCollapsed(false)}
+          />
+        ) : (
+          <main
+            className={`workspace-pane reader-pane${readerPaneMobileClass}${isReaderFullscreen ? ' is-fullscreen' : ''}`}
+            onPointerEnter={() => setActiveFontPane('reader')}
+            onPointerDown={() => setActiveFontPane('reader')}
+            onWheelCapture={(event) => handlePaneFontWheel('reader', event)}
+          >
+            <button
+              type="button"
+              className="panel-minimize-button reader-minimize-button"
+              aria-label={t('app.a11y.collapseReaderPane')}
+              onClick={() => {
+                setIsReaderFullscreen(false)
+                setRightSidebarCollapsed(true)
+              }}
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <button
+              type="button"
+              className="panel-fullscreen-button"
+              aria-label={isReaderFullscreen ? t('app.a11y.exitReaderFullscreen') : t('app.a11y.enterReaderFullscreen')}
+              aria-pressed={isReaderFullscreen}
+              onClick={() => setIsReaderFullscreen((fullscreen) => !fullscreen)}
+            >
+              <span aria-hidden="true">{isReaderFullscreen ? '□' : '▢'}</span>
+            </button>
+            <div className="reader-scroll" ref={readerScrollRef} onScroll={handleReaderScroll}>
+              {shouldRenderReaderTitle ? (
+                <header className="reader-article-header">
+                  <h1 className="reader-article-title">{currentDocument.title.trim()}</h1>
+                </header>
+              ) : null}
+              <Suspense fallback={null}>
+                <MarkdownSurface
+                  markdown={currentDocument.contentMd}
+                  qaRecords={activeRecords}
+                  config={config}
+                  surface="reader"
+                  documentId={currentDocument.id}
+                  documentPath={currentDocument.path}
+                  documents={documents}
+                  mountedVaultPath={mountedVaultPath}
+                  remoteLibraryId={remoteLibraryId}
+                  remoteRevisionId={remoteRevisionId}
+                  surfaceTitle={currentDocument.title}
+                  onAsk={openAskMenu}
+                  onOpenRecord={openRecordWidget}
+                  onOpenGroup={(recordIds, point) => setGroupChooser({ point, recordIds })}
+                  onOpenDocument={openDocument}
+                />
+              </Suspense>
+            </div>
+          </main>
+        )}
 
         {!isMobilePortraitLayout ? (
           <button
@@ -2339,60 +2516,6 @@ export function App() {
             aria-label={t('app.a11y.resizeRightSidebar')}
           />
         ) : null}
-
-        {!isMobilePortraitLayout && isRightPaneCollapsed ? (
-          <CollapsedRail
-            side="right"
-            ariaLabel={t('app.a11y.expandRightSidebar')}
-            onClick={() => setRightSidebarCollapsed(false)}
-          />
-        ) : (
-          <aside
-            className={`workspace-pane sidebar right-pane${rightPaneMobileClass}`}
-            onPointerEnter={() => setActiveFontPane('widget')}
-            onPointerDown={() => setActiveFontPane('widget')}
-            onWheelCapture={(event) => handlePaneFontWheel('widget', event)}
-          >
-            <Suspense fallback={null}>
-              <CanvasPane
-                canvas={canvas}
-                qaRecords={activeRecords}
-                config={config}
-                documents={documents}
-                mountedVaultPath={mountedVaultPath}
-                remoteLibraryId={remoteLibraryId}
-                remoteRevisionId={remoteRevisionId}
-                onCanvasChange={(nextCanvas) => {
-                  setCanvas((previous) => {
-                    const resolved =
-                      typeof nextCanvas === 'function'
-                        ? (nextCanvas as (draft: CanvasState | null) => CanvasState | null)(previous)
-                        : nextCanvas
-                    const normalized = resolved ? normalizeCanvasState(resolved) : resolved
-                    canvasRef.current = normalized
-                    return normalized
-                  })
-                }}
-                onWidgetFocus={focusWidget}
-                onWidgetChange={updateWidget}
-                onWidgetClose={closeWidget}
-                onAsk={openAskMenu}
-                onOpenContext={(widgetId) =>
-                  setContextModalTarget({
-                    kind: 'ask-widget',
-                    widgetId
-                  })
-                }
-                onSubmitCustom={submitCustomAsk}
-                onOpenRecord={openRecordWidget}
-                onOpenGroup={(recordIds, point) => setGroupChooser({ point, recordIds })}
-                onDeleteRecord={removeRecord}
-                onOpenDocument={openDocument}
-                onViewportSizeChange={setCanvasViewportSize}
-              />
-            </Suspense>
-          </aside>
-        )}
       </div>
 
       {askMenu ? (

@@ -628,34 +628,26 @@ export function GlobalSettingsModal({ repositoryBinding, onClose, onReloadWorksp
     <ModalShell title={t('chrome.workspaceSettings.title')} onClose={onClose}>
       <div className="settings-section">
         <strong>{t('chrome.workspaceSettings.section.repository')}</strong>
-        <div className="template-editor-list">
-          <div className="template-editor-card">
-            <div className="settings-grid">
-              <label className="settings-field">
-                <span>{t('chrome.workspaceSettings.activeMode')}</span>
-                <input value={currentModeLabel} readOnly />
-              </label>
-              <label className="settings-field">
-                <span>{t('chrome.workspaceSettings.libraryBinding')}</span>
-                <input value={currentLibraryLabel} readOnly />
-              </label>
-              <label className="settings-field">
-                <span>{t('chrome.workspaceSettings.sourceLabel')}</span>
-                <input value={repositoryBinding.sourceLabel ?? t('chrome.workspaceSettings.sourceLabelFallback')} readOnly />
-              </label>
-              <ThemeSwitcher variant="field" />
-              <LocaleSwitcher variant="field" />
-            </div>
-
-            {repositoryBinding.issue ? <p className="settings-warning">{repositoryBinding.issue}</p> : null}
-            <p className="modal-note">{t('chrome.workspaceSettings.remoteWorkspaceNote')}</p>
-
-            <div className="template-editor-actions repository-actions">
-              <button className="ghost-button small" onClick={() => void onReloadWorkspace()}>
-                {t('chrome.workspaceSettings.reloadWorkspace')}
-              </button>
-            </div>
-          </div>
+        <div className="settings-list">
+          <label className="settings-row">
+            <span>{t('chrome.workspaceSettings.activeMode')}</span>
+            <input value={currentModeLabel} readOnly />
+          </label>
+          <label className="settings-row">
+            <span>{t('chrome.workspaceSettings.libraryBinding')}</span>
+            <input value={currentLibraryLabel} readOnly />
+          </label>
+          <label className="settings-row">
+            <span>{t('chrome.workspaceSettings.sourceLabel')}</span>
+            <input value={repositoryBinding.sourceLabel ?? t('chrome.workspaceSettings.sourceLabelFallback')} readOnly />
+          </label>
+          <ThemeSwitcher variant="field" />
+          <LocaleSwitcher variant="field" />
+          {repositoryBinding.issue ? <p className="settings-warning">{repositoryBinding.issue}</p> : null}
+          <p className="modal-note">{t('chrome.workspaceSettings.remoteWorkspaceNote')}</p>
+          <button className="ghost-button small settings-action" onClick={() => void onReloadWorkspace()}>
+            {t('chrome.workspaceSettings.reloadWorkspace')}
+          </button>
         </div>
       </div>
 
@@ -666,25 +658,18 @@ export function GlobalSettingsModal({ repositoryBinding, onClose, onReloadWorksp
 
       <div className="settings-section">
         <strong>{t('chrome.workspaceSettings.section.account')}</strong>
-        <div className="template-editor-list">
-          <div className="template-editor-card">
-            <div className="settings-grid">
-              <label className="settings-field">
-                <span>{t('chrome.workspaceSettings.status')}</span>
-                <input value={auth.status === 'signed_in' ? t('chrome.workspaceSettings.statusSignedIn') : auth.status} readOnly />
-              </label>
-              <label className="settings-field">
-                <span>{t('chrome.workspaceSettings.email')}</span>
-                <input value={auth.user?.email ?? t('shared.unknownUser')} readOnly />
-              </label>
-            </div>
-
-            <div className="template-editor-actions repository-actions">
-              <button className="ghost-button small" onClick={() => void handleSignOut()}>
-                {t('shared.action.signOut')}
-              </button>
-            </div>
-          </div>
+        <div className="settings-list">
+          <label className="settings-row">
+            <span>{t('chrome.workspaceSettings.status')}</span>
+            <input value={auth.status === 'signed_in' ? t('chrome.workspaceSettings.statusSignedIn') : auth.status} readOnly />
+          </label>
+          <label className="settings-row">
+            <span>{t('chrome.workspaceSettings.email')}</span>
+            <input value={auth.user?.email ?? t('shared.unknownUser')} readOnly />
+          </label>
+          <button className="ghost-button small settings-action" onClick={() => void handleSignOut()}>
+            {t('shared.action.signOut')}
+          </button>
         </div>
       </div>
     </ModalShell>

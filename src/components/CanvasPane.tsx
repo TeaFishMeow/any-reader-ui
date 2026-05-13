@@ -40,7 +40,7 @@ interface CanvasPaneProps {
   onViewportSizeChange: (size: CanvasViewportSize) => void
 }
 
-type ResizeAxis = 'x' | 'y' | 'both'
+type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 const NOOP_ASK = (_selection: AskSelection) => undefined
 const NOOP_OPEN_RECORD = (_recordId: string) => undefined
@@ -380,7 +380,7 @@ export function CanvasPane({
     window.addEventListener('pointercancel', cleanup)
   }
 
-  function beginWidgetResize(event: React.PointerEvent<HTMLButtonElement>, widgetId: string, axis: ResizeAxis) {
+  function beginWidgetResize(event: React.PointerEvent<HTMLButtonElement>, widgetId: string, handle: ResizeHandle) {
     event.preventDefault()
     event.stopPropagation()
     onWidgetFocus(widgetId)
@@ -393,20 +393,37 @@ export function CanvasPane({
     const startX = event.clientX
     const startY = event.clientY
     const originSize = widget.size
+    const originPosition = widget.position
     const zoomRatio = viewport.zoom
-    const resizeCursor = axis === 'x' ? 'ew-resize' : axis === 'y' ? 'ns-resize' : 'nwse-resize'
+    const resizeCursor =
+      handle === 'e' || handle === 'w'
+        ? 'ew-resize'
+        : handle === 'n' || handle === 's'
+          ? 'ns-resize'
+          : handle === 'ne' || handle === 'sw'
+            ? 'nesw-resize'
+            : 'nwse-resize'
     const unlock = lockDocumentInteraction(resizeCursor)
     const pointerTarget = event.currentTarget
 
     const move = (moveEvent: PointerEvent) => {
-      const nextWidth = axis === 'y' ? originSize.w : originSize.w + (moveEvent.clientX - startX) / zoomRatio
-      const nextHeight = axis === 'x' ? originSize.h : originSize.h + (moveEvent.clientY - startY) / zoomRatio
+      const deltaX = (moveEvent.clientX - startX) / zoomRatio
+      const deltaY = (moveEvent.clientY - startY) / zoomRatio
+      const movesWest = handle.includes('w')
+      const movesEast = handle.includes('e')
+      const movesNorth = handle.includes('n')
+      const movesSouth = handle.includes('s')
+      const nextSize = clampWidgetSize({
+        w: movesWest ? originSize.w - deltaX : movesEast ? originSize.w + deltaX : originSize.w,
+        h: movesNorth ? originSize.h - deltaY : movesSouth ? originSize.h + deltaY : originSize.h
+      })
       onWidgetChange(widgetId, (candidate) => ({
         ...candidate,
-        size: clampWidgetSize({
-          w: nextWidth,
-          h: nextHeight
-        })
+        position: {
+          x: movesWest ? originPosition.x + originSize.w - nextSize.w : originPosition.x,
+          y: movesNorth ? originPosition.y + originSize.h - nextSize.h : originPosition.y
+        },
+        size: nextSize
       }))
     }
 
@@ -492,30 +509,17 @@ export function CanvasPane({
                 ) : null}
                 {!widget.isCollapsed ? (
                   <>
-                    <button
-                      type="button"
-                      className="widget-resize-handle widget-resize-handle--right"
-                      data-no-canvas-pan="true"
-                      data-no-widget-drag="true"
-                      aria-label={t('canvas.action.resizeWidget')}
-                      onPointerDown={(event) => beginWidgetResize(event, widget.id, 'x')}
-                    />
-                    <button
-                      type="button"
-                      className="widget-resize-handle widget-resize-handle--bottom-rail"
-                      data-no-canvas-pan="true"
-                      data-no-widget-drag="true"
-                      aria-label={t('canvas.action.resizeWidget')}
-                      onPointerDown={(event) => beginWidgetResize(event, widget.id, 'y')}
-                    />
-                    <button
-                      type="button"
-                      className="widget-resize-handle widget-resize-handle--corner"
-                      data-no-canvas-pan="true"
-                      data-no-widget-drag="true"
-                      aria-label={t('canvas.action.resizeWidget')}
-                      onPointerDown={(event) => beginWidgetResize(event, widget.id, 'both')}
-                    />
+                    {(['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as ResizeHandle[]).map((handle) => (
+                      <button
+                        key={handle}
+                        type="button"
+                        className={`widget-resize-handle widget-resize-handle--${handle}`}
+                        data-no-canvas-pan="true"
+                        data-no-widget-drag="true"
+                        aria-label={t('canvas.action.resizeWidget')}
+                        onPointerDown={(event) => beginWidgetResize(event, widget.id, handle)}
+                      />
+                    ))}
                   </>
                 ) : null}
               </div>
@@ -594,12 +598,12 @@ function AskWidgetView({
     <div className="ask-widget">
       {widget.props.mode === 'custom' && widget.props.requestState === 'editing' ? (
         <>
-          <div className="context-card">
+          <div className="widget-plain-block">
             <span>{t('canvas.label.selectedText')}</span>
             <strong>{getRecordSelectedText(qaRecord, preview?.selectedText)}</strong>
           </div>
 
-          <div className="context-card">
+          <div className="widget-plain-block">
             <span>
               {currentContextMode
                 ? `${t('canvas.label.contextPreview')} - ${t(contextModeLabelKey(currentContextMode))}`
@@ -654,7 +658,7 @@ function AskWidgetView({
               />
             </div>
           ) : null}
-          <div className="streaming-card widget-answer-panel">
+          <div className="widget-answer-panel">
             <div className="streaming-state">
               <span>{t(requestStateLabelKey(widget.props.requestState))}</span>
             </div>
