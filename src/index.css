@@ -220,7 +220,7 @@ svg path {
 
 .resize-handle:hover,
 .resize-handle:focus-visible {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: transparent;
   outline: none;
 }
 

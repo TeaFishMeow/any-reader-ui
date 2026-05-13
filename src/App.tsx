@@ -158,8 +158,13 @@ function resizeFrame(handle: ResizeHandle, frame: ResizeFrame, dx: number, dy: n
   }
 }
 
-function ResizeHandles({ onResize }: { onResize: (handle: ResizeHandle, dx: number, dy: number) => void }) {
-  const handles: ResizeHandle[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+function ResizeHandles({
+  handles = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'],
+  onResize
+}: {
+  handles?: ResizeHandle[]
+  onResize: (handle: ResizeHandle, dx: number, dy: number) => void
+}) {
   return (
     <>
       {handles.map((handle) => (
@@ -198,6 +203,7 @@ function WindowFrame({
   style,
   onMouseDown,
   onResize,
+  resizeHandles,
   children
 }: {
   title?: ReactNode
@@ -207,6 +213,7 @@ function WindowFrame({
   style?: CSSProperties
   onMouseDown?: () => void
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
+  resizeHandles?: ResizeHandle[]
   children: ReactNode
 }) {
   return (
@@ -216,7 +223,7 @@ function WindowFrame({
         <div className="window-actions">{actions}</div>
       </header>
       {!collapsed ? <div className="window-body">{children}</div> : null}
-      {!collapsed && onResize ? <ResizeHandles onResize={onResize} /> : null}
+      {!collapsed && onResize ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
     </section>
   )
 }
@@ -1093,6 +1100,7 @@ export function App() {
         collapsed={config.layout.leftSidebarCollapsed}
         title={<Logo />}
         style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: directoryFrame.h, zIndex: 20 }}
+        resizeHandles={['e']}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: 0, y: directoryFrame.y, w: leftWidth, h: directoryFrame.h }, dx, dy, RAIL_WIDTH, 160)
           setDirectoryFrame({ ...frame, x: 0 })
@@ -1135,6 +1143,7 @@ export function App() {
         collapsed={config.layout.rightSidebarCollapsed}
         title={<span />}
         style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
+        resizeHandles={['e']}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: readerLeft, y: readerFrame.y, w: Number(readerWidth), h: readerFrame.h }, dx, dy, RAIL_WIDTH, 160)
           setReaderMaximized(false)
