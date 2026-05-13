@@ -1,9 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-const LOCAL_API = '/__any-reader-local/'
-const DEFAULT_VAULT = '微积分二层次下'
-const SIDEBAR_WIDTH = 268
-const RAIL_WIDTH = 36
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from '../src_original_reference/lib/bootstrap'
+import { fetchRemoteDocument } from '../src_original_reference/lib/api'
+import { applyPromptTemplateDefaults, MAIN_CANVAS_ID } from '../src_original_reference/lib/defaults'
+import {
+  buildContextPreview,
+  buildPendingAskSession,
+  createPendingRecord,
+  nextWidgetFrame,
+  normalizeCanvasViewport,
+  sortTemplates,
+  upsertQaRecord
+} from '../src_original_reference/lib/app-helpers'
+import { buildModelInfo, streamAnswer } from '../src_original_reference/lib/provider'
+import { clamp, createId, makeSummary, markdownToPlainText } from '../src_original_reference/lib/text'
+import type {
+  AppConfig,
+  AskAction,
+  CanvasState,
+  DocumentNode,
+  LlmAccessState,
+  PromptTemplate,
+  QARecord,
+  RepoMeta,
+  RepositoryBinding,
+  SidebarNode,
+  WidgetState,
+  WorkspaceSnapshot
+} from '../src_original_reference/types/domain'
 
 type IconName =
   | 'chevronLeft'
@@ -14,368 +37,104 @@ type IconName =
   | 'close'
   | 'trash'
   | 'settings'
-  | 'book'
   | 'folder'
   | 'file'
-  | 'model'
+  | 'spark'
   | 'save'
   | 'keyboard'
-  | 'spark'
+  | 'plus'
+  | 'minus'
 
-interface DirEntry {
-  name: string
-  path: string
-  isDir: boolean
-}
-
-interface TreeNode extends DirEntry {
-  children?: TreeNode[]
-}
-
-interface PromptTemplate {
-  id: string
-  title: string
-  body: string
-  color: string
-  order: number
-  isEnabled?: boolean
-}
-
-interface AppConfig {
-  layout?: {
-    leftSidebarCollapsed?: boolean
-    rememberLayout?: boolean
-  }
-  navigation?: {
-    collapsedSidebarFolderIds?: string[]
-    readerScrollPositions?: Record<string, number>
-  }
-  rendering?: {
-    readerFontPx?: number
-    widgetFontPx?: number
-  }
-  provider?: {
-    baseUrl?: string
-    model?: string
-    temperature?: number
-  }
-  repository?: {
-    mountedVaultPath?: string
-    lastOpenedDocumentPath?: string
-  }
-  shortcuts?: Record<string, string>
-  templates?: PromptTemplate[]
-}
-
-interface QaRecord {
-  id: string
-  sourceSurface: 'reader'
-  sourceDocumentId: string
-  selectedText: string
-  promptTemplateId: string
-  promptIntent: string
-  systemStatePrompt: string
-  readingContextMode: string
-  readingContextSnapshot: string
-  fullPrompt: string
-  questionText: string
-  answerMarkdown: string
-  answerStatus: 'done'
-  modelInfo: {
-    provider: string
-    model: string
-    temperature: number
-  }
-  visualStyle: {
-    color: string
-    markerType: string
-  }
-  lifecycle: {
-    isDeleted: boolean
-    deletedAt?: string
-  }
-  createdAt: string
-  updatedAt: string
-}
-
-interface QaWindowState {
-  id: string
-  recordId: string
-  x: number
-  y: number
-  w: number
-  h: number
-  z: number
-  collapsed: boolean
-  record?: QaRecord
-}
-
-interface CanvasFile {
-  id: string
-  viewport: {
-    x: number
-    y: number
-    zoom: number
-  }
-  widgetStates: Array<{
-    id: string
-    position: { x: number; y: number }
-    size: { w: number; h: number }
-    zIndex: number
-    isCollapsed: boolean
-    type: string
-    props: { qaRecordId?: string }
-  }>
-  selection?: { widgetId?: string }
-  updatedAt: string
-}
+type ModalName = 'settings' | null
 
 interface AskMenuState {
-  x: number
-  y: number
-  text: string
+  session: ReturnType<typeof buildPendingAskSession>
+  hoveredTemplateId: string | null
 }
 
-interface FloatingMenuState {
-  x: number
-  y: number
+interface MenuState {
   kind: 'model' | 'settings'
+  x: number
+  y: number
 }
 
-function apiUrl(route: string, path = '') {
-  const url = new URL(`${LOCAL_API}${route}`, window.location.origin)
-  if (path) {
-    url.searchParams.set('path', path)
-  }
-  return `${url.pathname}${url.search}`
+const LEFT_DEFAULT = 280
+const RAIL_WIDTH = 36
+const READER_WIDTH = 780
+const PERSIST_DELAY_MS = 450
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
 }
 
-async function readJson<T>(path: string, fallback: T): Promise<T> {
-  try {
-    const response = await fetch(apiUrl('text', path))
-    if (!response.ok) return fallback
-    return (await response.json()) as T
-  } catch {
-    return fallback
-  }
+function titleForDocument(document: DocumentNode) {
+  return document.title.trim() || document.path.split('/').pop()?.replace(/\.md$/i, '') || document.path
 }
 
-async function readText(path: string, fallback = '') {
-  try {
-    const response = await fetch(apiUrl('text', path))
-    if (!response.ok) return fallback
-    return await response.text()
-  } catch {
-    return fallback
-  }
-}
-
-async function writeText(path: string, content: string) {
-  await fetch(apiUrl('text', path), {
-    method: 'PUT',
-    body: content
-  })
-}
-
-async function listDir(path: string) {
-  const response = await fetch(apiUrl('list', path))
-  if (!response.ok) return []
-  return (await response.json()) as DirEntry[]
-}
-
-async function readTree(rootPath: string): Promise<TreeNode[]> {
-  const entries = await listDir(rootPath)
-  const visible = entries.filter((entry) => !entry.name.startsWith('.') && (entry.isDir || entry.name.endsWith('.md')))
-  return Promise.all(
-    visible.map(async (entry) => ({
-      ...entry,
-      children: entry.isDir ? await readTree(`${rootPath}/${entry.path}`) : undefined
-    }))
-  )
-}
-
-function id() {
-  return `qa_${crypto.randomUUID()}`
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
-}
-
-function normalizeVaultPath(config: AppConfig) {
-  return config.repository?.mountedVaultPath || DEFAULT_VAULT
-}
-
-function toDocumentTitle(path: string) {
-  return path.split('/').pop()?.replace(/\.md$/i, '') || '正文'
-}
-
-function stripMarkdown(markdown: string) {
-  return markdown
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[`*_>#-]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function encodeVaultPath(path: string) {
-  return path.split('/').map(encodeURIComponent).join('/')
-}
-
-function resolveMarkdownAsset(documentPath: string, rawAssetPath: string) {
-  if (/^https?:\/\//i.test(rawAssetPath) || rawAssetPath.startsWith('/')) return rawAssetPath
-  const base = documentPath.split('/').slice(0, -1)
-  const parts = [...base, ...rawAssetPath.split('/')]
-  const resolved: string[] = []
-  parts.forEach((part) => {
-    if (!part || part === '.') return
-    if (part === '..') resolved.pop()
-    else resolved.push(part)
-  })
-  return `/vault/${encodeVaultPath(resolved.join('/'))}`
-}
-
-function formatMarkdown(markdown: string, documentPath = '') {
-  return markdown.split(/\n{2,}/).map((block, index) => {
-    const text = block.trim()
-    if (!text) return null
-    const lines = text.split(/\n/)
-    const imageMatch = lines[0].trim().match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/)
-    if (imageMatch && documentPath) {
-      return (
-        <figure className="markdown-figure" key={index}>
-          <img src={resolveMarkdownAsset(documentPath, imageMatch[2])} alt={imageMatch[1] || ''} />
-          {lines.slice(1).join(' ').trim() ? <figcaption>{lines.slice(1).join(' ').trim()}</figcaption> : null}
-        </figure>
-      )
-    }
-    if (/^#{1,6}\s/.test(text)) {
-      const level = text.match(/^#+/)?.[0].length ?? 1
-      const heading = text.replace(/^#{1,6}\s*/, '')
-      if (level === 1) return <h1 key={index}>{heading}</h1>
-      if (level === 2) return <h2 key={index}>{heading}</h2>
-      return <h3 key={index}>{heading}</h3>
-    }
-    if (/^\$\$[\s\S]*\$\$$/.test(text)) {
-      return (
-        <pre className="math-block" key={index}>
-          {text.replace(/^\$\$|\$\$$/g, '')}
-        </pre>
-      )
-    }
-    if (/^[-*]\s/m.test(text)) {
-      return (
-        <ul key={index}>
-          {text.split(/\n/).map((line, itemIndex) => (
-            <li key={itemIndex}>{line.replace(/^[-*]\s*/, '')}</li>
-          ))}
-        </ul>
-      )
-    }
-    return <p key={index}>{text}</p>
-  })
-}
-
-function defaultConfig(): AppConfig {
-  return {
-    layout: { leftSidebarCollapsed: false, rememberLayout: true },
-    navigation: { collapsedSidebarFolderIds: [] },
-    rendering: { readerFontPx: 16, widgetFontPx: 15 },
-    provider: { baseUrl: '', model: 'gpt-4.1-mini', temperature: 0.3 },
-    repository: {
-      mountedVaultPath: DEFAULT_VAULT,
-      lastOpenedDocumentPath: '第10章 重积分/index.md'
-    },
-    shortcuts: {
-      toggleDirectory: 'f',
-      toggleReader: 'v',
-      openSettings: ',',
-      closeMenu: 'escape'
-    },
-    templates: [
-      {
-        id: 'template-solve',
-        title: '解题',
-        body: '按照例题的格式完成这道题。',
-        color: '#c586c0',
-        order: 0,
-        isEnabled: true
-      },
-      {
-        id: 'template-variable-meaning',
-        title: '变量含义',
-        body: '给出这个变量的元素类型、含义、功能。',
-        color: '#4ec9b0',
-        order: 1,
-        isEnabled: true
-      },
-      {
-        id: 'template-why',
-        title: '为什么',
-        body: '解释选中部分为什么是对的。',
-        color: '#dcdcaa',
-        order: 2,
-        isEnabled: true
-      }
-    ]
-  }
-}
-
-function defaultCanvas(): CanvasFile {
-  return {
-    id: 'main',
-    viewport: { x: 0, y: 0, zoom: 1 },
-    widgetStates: [],
-    updatedAt: new Date().toISOString()
+function iconPath(name: IconName) {
+  switch (name) {
+    case 'chevronLeft':
+      return 'M10.5 3.5 6 8l4.5 4.5'
+    case 'chevronRight':
+      return 'M5.5 3.5 10 8l-4.5 4.5'
+    case 'chevronUp':
+      return 'M3.5 10.5 8 6l4.5 4.5'
+    case 'chevronDown':
+      return 'M3.5 5.5 8 10l4.5-4.5'
+    case 'maximize':
+      return 'M4 4h8v8H4z'
+    case 'close':
+      return 'M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5'
+    case 'trash':
+      return 'M3.5 4.5h9M6.5 2.75h3M5 4.5v7.25c0 .4.35.75.75.75h4.5c.4 0 .75-.35.75-.75V4.5M6.75 6.5v4M9.25 6.5v4'
+    case 'settings':
+      return 'M8 5.5A2.5 2.5 0 1 0 8 10.5 2.5 2.5 0 0 0 8 5.5ZM8 1.75v2M8 12.25v2M14.25 8h-2M3.75 8h-2M12.42 3.58 11 5M5 11l-1.42 1.42M12.42 12.42 11 11M5 5 3.58 3.58'
+    case 'folder':
+      return 'M2 4.5h4.25l1 1.5H14v6.5H2z'
+    case 'file':
+      return 'M4 2.5h5.25L12 5.25v8.25H4zM9.25 2.5v3h3'
+    case 'spark':
+      return 'M8 2.5 9.35 6.65 13.5 8l-4.15 1.35L8 13.5 6.65 9.35 2.5 8l4.15-1.35z'
+    case 'save':
+      return 'M3 2.5h8.5L13 4v9.5H3zM5 2.5v4h5v-4M5 13.5v-4h6v4'
+    case 'keyboard':
+      return 'M2.5 4.5h11v7h-11zM4.5 7h1M7 7h1M9.5 7h1M4.5 9.5h7'
+    case 'plus':
+      return 'M8 3.5v9M3.5 8h9'
+    case 'minus':
+      return 'M3.5 8h9'
   }
 }
 
 function Icon({ name }: { name: IconName }) {
-  const common = { fill: 'none', stroke: 'currentColor', strokeLinecap: 'square' as const, strokeWidth: 1.7 }
-  if (name === 'chevronLeft') return <svg viewBox="0 0 16 16"><path {...common} d="M10 3 5 8l5 5" /></svg>
-  if (name === 'chevronRight') return <svg viewBox="0 0 16 16"><path {...common} d="m6 3 5 5-5 5" /></svg>
-  if (name === 'chevronUp') return <svg viewBox="0 0 16 16"><path {...common} d="m3 10 5-5 5 5" /></svg>
-  if (name === 'chevronDown') return <svg viewBox="0 0 16 16"><path {...common} d="m3 6 5 5 5-5" /></svg>
-  if (name === 'maximize') return <svg viewBox="0 0 16 16"><path {...common} d="M4 4h8v8H4z" /></svg>
-  if (name === 'close') return <svg viewBox="0 0 16 16"><path {...common} d="m4 4 8 8M12 4l-8 8" /></svg>
-  if (name === 'trash') return <svg viewBox="0 0 16 16"><path {...common} d="M3 5h10M6 5V3h4v2M5 7v6h6V7" /></svg>
-  if (name === 'settings') return <svg viewBox="0 0 16 16"><path {...common} d="M8 5.5A2.5 2.5 0 1 0 8 10.5 2.5 2.5 0 0 0 8 5.5Zm0-4v2m0 9v2m6.5-6.5h-2m-9 0h-2m11.1-4.6-1.4 1.4m-6.4 6.4-1.4 1.4m9.2 0-1.4-1.4M4.8 4.8 3.4 3.4" /></svg>
-  if (name === 'book') return <svg viewBox="0 0 16 16"><path {...common} d="M3 3h4a2 2 0 0 1 2 2v8a2 2 0 0 0-2-2H3zM9 5a2 2 0 0 1 2-2h2v8h-2a2 2 0 0 0-2 2" /></svg>
-  if (name === 'folder') return <svg viewBox="0 0 16 16"><path {...common} d="M2 5h5l1 2h6v6H2z" /></svg>
-  if (name === 'file') return <svg viewBox="0 0 16 16"><path {...common} d="M4 2h5l3 3v9H4zM9 2v4h3" /></svg>
-  if (name === 'model') return <svg viewBox="0 0 16 16"><path {...common} d="M8 2v12M3 5h10M3 11h10M5 3l6 10M11 3 5 13" /></svg>
-  if (name === 'save') return <svg viewBox="0 0 16 16"><path {...common} d="M3 2h9l1 1v11H3zM5 2v5h6V2M5 14v-4h6v4" /></svg>
-  if (name === 'keyboard') return <svg viewBox="0 0 16 16"><path {...common} d="M2 4h12v8H2zM4 7h1m2 0h1m2 0h1M4 10h8" /></svg>
-  return <svg viewBox="0 0 16 16"><path {...common} d="m8 2 1.2 3.6L13 7 9.2 8.4 8 12 6.8 8.4 3 7l3.8-1.4z" /></svg>
-}
-
-function Logo() {
   return (
-    <span className="logo-mark" aria-label="AnyReader">
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M3 2h8l6 6v10H3z" />
-        <path d="M11 2v6h6" />
-        <path d="M6 12h8M6 15h6" />
-      </svg>
-      <strong>AnyReader</strong>
-    </span>
+    <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+      <path d={iconPath(name)} />
+    </svg>
   )
 }
 
 function IconButton({
   icon,
   label,
-  onClick,
-  active = false
+  active,
+  danger,
+  onClick
 }: {
   icon: IconName
   label: string
-  onClick?: () => void
   active?: boolean
+  danger?: boolean
+  onClick?: () => void
 }) {
   return (
-    <button className={`icon-button${active ? ' is-active' : ''}`} type="button" title={label} aria-label={label} onClick={onClick}>
+    <button
+      className={`icon-button${active ? ' is-active' : ''}${danger ? ' danger' : ''}`}
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+    >
       <Icon name={icon} />
     </button>
   )
@@ -383,22 +142,24 @@ function IconButton({
 
 function WindowFrame({
   title,
-  className = '',
-  style,
   actions,
+  className = '',
   collapsed,
+  style,
+  onMouseDown,
   children
 }: {
-  title?: React.ReactNode
+  title?: ReactNode
+  actions: ReactNode
   className?: string
-  style?: React.CSSProperties
-  actions: React.ReactNode
   collapsed?: boolean
-  children: React.ReactNode
+  style?: CSSProperties
+  onMouseDown?: () => void
+  children: ReactNode
 }) {
   return (
-    <section className={`vscode-window ${className}${collapsed ? ' is-collapsed' : ''}`} style={style}>
-      <header className="window-titlebar">
+    <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}`} style={style} onMouseDown={onMouseDown}>
+      <header className="window-titlebar" data-window-drag="true">
         <div className="window-title">{title}</div>
         <div className="window-actions">{actions}</div>
       </header>
@@ -407,140 +168,212 @@ function WindowFrame({
   )
 }
 
-function TreeView({
+function Logo() {
+  return (
+    <span className="logo">
+      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+        <path d="M3 2.5h8l6 6v9H3z" />
+        <path d="M11 2.5v6h6" />
+        <path d="M6 12h8M6 15h5" />
+      </svg>
+      <strong>AnyReader</strong>
+    </span>
+  )
+}
+
+function markdownBlocks(markdown: string, documentPath?: string) {
+  const chunks = markdown.split(/\n{2,}/)
+  return chunks.map((raw, index) => {
+    const block = raw.trim()
+    if (!block) return null
+    const image = block.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*(.*)$/s)
+    if (image) {
+      return (
+        <figure className="markdown-figure" key={index}>
+          <img src={resolveAssetPath(documentPath, image[2])} alt={image[1]} />
+          {image[3].trim() ? <figcaption>{image[3].trim()}</figcaption> : null}
+        </figure>
+      )
+    }
+    if (/^#{1,6}\s/.test(block)) {
+      const text = block.replace(/^#{1,6}\s*/, '')
+      if (block.startsWith('# ')) return <h1 key={index}>{text}</h1>
+      if (block.startsWith('## ')) return <h2 key={index}>{text}</h2>
+      return <h3 key={index}>{text}</h3>
+    }
+    if (/^\$\$[\s\S]*\$\$$/.test(block)) {
+      return <pre className="math-block" key={index}>{block.replace(/^\$\$|\$\$$/g, '').trim()}</pre>
+    }
+    if (/^[-*]\s/m.test(block)) {
+      return (
+        <ul key={index}>
+          {block.split(/\n/).map((line, itemIndex) => <li key={itemIndex}>{line.replace(/^[-*]\s*/, '')}</li>)}
+        </ul>
+      )
+    }
+    return <p key={index}>{block}</p>
+  })
+}
+
+function resolveAssetPath(documentPath: string | undefined, raw: string) {
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
+  const base = documentPath ? documentPath.split('/').slice(0, -1) : []
+  const output: string[] = []
+  for (const part of [...base, ...raw.split('/')]) {
+    if (!part || part === '.') continue
+    if (part === '..') output.pop()
+    else output.push(part)
+  }
+  return `/vault/${output.map(encodeURIComponent).join('/')}`
+}
+
+function plainContextForDocument(document: DocumentNode) {
+  return document.contentPlainText || markdownToPlainText(document.contentMd)
+}
+
+function displayAnswerMarkdown(markdown: string) {
+  return markdown.replace(/^##\s*问题\s*\n+/, '')
+}
+
+function selectionAction(args: {
+  eventPoint: { x: number; y: number }
+  surface: AskAction['surface']
+  target: AskAction['target']
+  surfaceTitle: string
+  surfaceText: string
+  sourceQaRecordId?: string
+}): AskAction | null {
+  const selection = window.getSelection()
+  const text = selection?.toString().trim()
+  if (!selection || !text) return null
+  const content = args.surfaceText
+  const startOffset = content.indexOf(text)
+  const endOffset = startOffset >= 0 ? startOffset + text.length : undefined
+  const radius = 180
+  return {
+    surface: args.surface,
+    target: args.target,
+    surfaceTitle: args.surfaceTitle,
+    sourceQaRecordId: args.sourceQaRecordId,
+    selection: {
+      text,
+      kind: 'plain',
+      startOffset: startOffset >= 0 ? startOffset : undefined,
+      endOffset,
+      surfaceText: content,
+      contextPrefix: startOffset >= 0 ? content.slice(Math.max(0, startOffset - radius), startOffset) : undefined,
+      contextSuffix: endOffset !== undefined ? content.slice(endOffset, endOffset + radius) : undefined,
+      anchorQuote: text
+    },
+    menuPoint: args.eventPoint
+  }
+}
+
+function Sidebar({
+  repo,
   nodes,
-  rootPath,
-  selectedPath,
-  collapsedFolders,
-  onToggleFolder,
-  onOpen
+  documents,
+  currentDocumentId,
+  collapsedIds,
+  onToggle,
+  onOpen,
+  onAsk
 }: {
-  nodes: TreeNode[]
-  rootPath: string
-  selectedPath: string
-  collapsedFolders: string[]
-  onToggleFolder: (path: string) => void
-  onOpen: (path: string) => void
+  repo: RepoMeta
+  nodes: SidebarNode[]
+  documents: DocumentNode[]
+  currentDocumentId: string
+  collapsedIds: string[]
+  onToggle: (nodeId: string) => void
+  onOpen: (documentId: string) => void
+  onAsk: (action: AskAction) => void
 }) {
-  const renderNode = (node: TreeNode, depth: number) => {
-    const documentPath = node.path
-    const fullPath = `${rootPath}/${documentPath}`
-    const folderId = `folder:${documentPath}`
-    const isCollapsed = collapsedFolders.includes(folderId)
+  const collapsedSet = useMemo(() => new Set(collapsedIds), [collapsedIds])
+  const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
+  const childrenMap = useMemo(() => {
+    const map = new Map<string, SidebarNode[]>()
+    nodes.forEach((node) => {
+      if (!node.parentId) return
+      map.set(node.parentId, [...(map.get(node.parentId) ?? []), node])
+    })
+    return map
+  }, [nodes])
+
+  const collectText = (node: SidebarNode): string => {
+    if (node.type === 'document') return documentMap.get(node.documentId ?? node.id)?.contentPlainText ?? node.label
+    const queue = [...(childrenMap.get(node.id) ?? [])]
+    const parts: string[] = []
+    while (queue.length) {
+      const item = queue.shift()
+      if (!item) continue
+      if (item.type === 'document') {
+        const document = documentMap.get(item.documentId ?? item.id)
+        if (document) parts.push(`# ${document.title}\n${document.contentPlainText}`)
+      } else {
+        queue.push(...(childrenMap.get(item.id) ?? []))
+      }
+    }
+    return parts.join('\n\n')
+  }
+
+  const openNodeMenu = (event: React.MouseEvent, node: SidebarNode) => {
+    event.preventDefault()
+    onAsk({
+      surface: 'sidebar',
+      target: {
+        sidebarNodeId: node.id,
+        sidebarNodeType: node.type,
+        sidebarLabel: node.label
+      },
+      selection: {
+        text: node.label,
+        kind: 'node-label',
+        surfaceText: collectText(node)
+      },
+      surfaceTitle: node.label,
+      menuPoint: { x: event.clientX, y: event.clientY }
+    })
+  }
+
+  const renderNode = (node: SidebarNode, depth = 0) => {
+    const children = childrenMap.get(node.id) ?? []
+    const expandable = children.length > 0
+    const collapsed = collapsedSet.has(node.id)
+    const active = node.type === 'document' && (node.documentId ?? node.id) === currentDocumentId
     return (
-      <li key={documentPath}>
+      <li key={node.id}>
         <button
-          className={`tree-item${documentPath === selectedPath ? ' is-active' : ''}`}
+          className={`tree-item${active ? ' is-active' : ''}`}
           style={{ paddingLeft: 8 + depth * 14 }}
-          onClick={() => (node.isDir ? onToggleFolder(folderId) : onOpen(documentPath))}
-          title={node.name}
           type="button"
+          onClick={() => node.type === 'document' ? onOpen(node.documentId ?? node.id) : expandable ? onToggle(node.id) : undefined}
+          onContextMenu={(event) => openNodeMenu(event, node)}
         >
-          <Icon name={node.isDir ? 'folder' : 'file'} />
-          <span>{node.name.replace(/\.md$/i, '')}</span>
+          <Icon name={node.type === 'document' ? 'file' : 'folder'} />
+          <span>{node.label}</span>
         </button>
-        {node.isDir && !isCollapsed && node.children?.length ? (
-          <ul>{node.children.map((child) => renderNode({ ...child, path: child.path || fullPath }, depth + 1))}</ul>
-        ) : null}
+        {expandable && !collapsed ? <ul>{children.map((child) => renderNode(child, depth + 1))}</ul> : null}
       </li>
     )
   }
 
-  return <ul className="tree-view">{nodes.map((node) => renderNode(node, 0))}</ul>
-}
-
-function DirectoryFooter({
-  config,
-  onMenu,
-  onSettings
-}: {
-  config: AppConfig
-  onMenu: (menu: FloatingMenuState) => void
-  onSettings: () => void
-}) {
-  return (
-    <footer className="directory-footer">
-      <button
-        className="footer-model"
-        type="button"
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect()
-          onMenu({ kind: 'model', x: rect.left, y: rect.top })
-        }}
-      >
-        <Icon name="model" />
-        <span>{config.provider?.model || 'model'}</span>
-      </button>
-      <IconButton icon="settings" label="设置" onClick={onSettings} />
-    </footer>
-  )
-}
-
-function FloatingMenu({
-  state,
-  config,
-  onClose,
-  onOpenSettings
-}: {
-  state: FloatingMenuState
-  config: AppConfig
-  onClose: () => void
-  onOpenSettings: () => void
-}) {
-  const ref = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) onClose()
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [onClose])
-
-  const items =
-    state.kind === 'model'
-      ? [
-          { icon: 'model' as IconName, label: config.provider?.model || 'gpt-4.1-mini' },
-          { icon: 'spark' as IconName, label: `temperature ${config.provider?.temperature ?? 0.3}` },
-          { icon: 'settings' as IconName, label: 'provider', action: onOpenSettings }
-        ]
-      : [
-          { icon: 'settings' as IconName, label: 'preferences', action: onOpenSettings },
-          { icon: 'keyboard' as IconName, label: 'shortcuts', action: onOpenSettings }
-        ]
-
-  return (
-    <div ref={ref} className="floating-menu" style={{ left: state.x, top: state.y - 8 }}>
-      {items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          onClick={() => {
-            item.action?.()
-            onClose()
-          }}
-        >
-          <Icon name={item.icon} />
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </div>
-  )
+  return <ul className="tree-list">{(childrenMap.get(repo.id) ?? []).map((node) => renderNode(node))}</ul>
 }
 
 function AskMenu({
   state,
   templates,
+  onHover,
   onPick,
   onClose
 }: {
   state: AskMenuState
   templates: PromptTemplate[]
-  onPick: (template: PromptTemplate, text: string) => void
+  onHover: (templateId: string) => void
+  onPick: (template: PromptTemplate) => void
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
-
   useEffect(() => {
     const close = (event: MouseEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) onClose()
@@ -552,14 +385,21 @@ function AskMenu({
   return (
     <div
       ref={ref}
-      className="ask-context-menu"
+      className="ask-menu"
       style={{
-        left: clamp(state.x, 12, window.innerWidth - 310),
-        top: clamp(state.y, 12, window.innerHeight - 260)
+        left: clamp(state.session.action.menuPoint.x, 12, window.innerWidth - 340),
+        top: clamp(state.session.action.menuPoint.y, 12, window.innerHeight - 260)
       }}
     >
       {templates.map((template) => (
-        <button key={template.id} type="button" onClick={() => onPick(template, state.text)}>
+        <button
+          key={template.id}
+          className={template.id === state.hoveredTemplateId ? 'is-hovered' : ''}
+          type="button"
+          onMouseEnter={() => onHover(template.id)}
+          onFocus={() => onHover(template.id)}
+          onClick={() => onPick(template)}
+        >
           <span style={{ color: template.color }}>{template.title}</span>
           <small>{template.body}</small>
         </button>
@@ -568,525 +408,722 @@ function AskMenu({
   )
 }
 
+function FloatingMenu({
+  state,
+  config,
+  llmAccess,
+  onClose,
+  onOpenSettings,
+  onSelectModel
+}: {
+  state: MenuState
+  config: AppConfig
+  llmAccess: LlmAccessState | null
+  onClose: () => void
+  onOpenSettings: () => void
+  onSelectModel: (modelId: string) => void
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose()
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [onClose])
+
+  const models = llmAccess?.models ?? []
+  return (
+    <div ref={ref} className="floating-menu" style={{ left: state.x, top: state.y }}>
+      {state.kind === 'model' ? (
+        models.length ? models.map((model) => (
+          <button key={model.id} type="button" onClick={() => { onSelectModel(model.id); onClose() }}>
+            <Icon name="spark" />
+            <span>{model.displayName || model.model}</span>
+          </button>
+        )) : (
+          <button type="button">
+            <Icon name="spark" />
+            <span>{config.provider.model}</span>
+          </button>
+        )
+      ) : (
+        <button type="button" onClick={() => { onOpenSettings(); onClose() }}>
+          <Icon name="settings" />
+          <span>Settings</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 function SettingsWindow({
   config,
+  binding,
   onClose,
   onChange,
-  onSave
+  onSave,
+  onAddTemplate
 }: {
   config: AppConfig
+  binding: RepositoryBinding | null
   onClose: () => void
-  onChange: (config: AppConfig) => void
+  onChange: (updater: (config: AppConfig) => AppConfig) => void
   onSave: () => void
+  onAddTemplate: () => void
 }) {
-  const shortcuts = config.shortcuts ?? {}
-  const updateShortcut = (key: string, value: string) => {
-    onChange({ ...config, shortcuts: { ...shortcuts, [key]: value.toLowerCase() } })
-  }
-  const templates = [...(config.templates ?? [])].sort((a, b) => a.order - b.order)
-
+  const templates = sortTemplates(config.templates)
   return (
     <WindowFrame
       className="settings-window"
       title="设置"
       actions={<IconButton icon="close" label="关闭" onClick={onClose} />}
     >
-      <div className="settings-grid">
+      <div className="settings-body">
         <section>
-          <h2>模型</h2>
+          <h2>Provider</h2>
           <label>
             <span>Base URL</span>
-            <input
-              value={config.provider?.baseUrl ?? ''}
-              onChange={(event) =>
-                onChange({ ...config, provider: { ...config.provider, baseUrl: event.target.value } })
-              }
-            />
+            <input value={config.provider.baseUrl} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, baseUrl: event.target.value } }))} />
+          </label>
+          <label>
+            <span>API Key</span>
+            <input value={config.provider.apiKey} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, apiKey: event.target.value } }))} />
           </label>
           <label>
             <span>Model</span>
-            <input
-              value={config.provider?.model ?? ''}
-              onChange={(event) => onChange({ ...config, provider: { ...config.provider, model: event.target.value } })}
-            />
+            <input value={config.provider.model} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, model: event.target.value } }))} />
           </label>
           <label>
             <span>Temperature</span>
-            <input
-              type="number"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.provider?.temperature ?? 0.3}
-              onChange={(event) =>
-                onChange({
-                  ...config,
-                  provider: { ...config.provider, temperature: Number(event.target.value) }
-                })
-              }
-            />
+            <input type="number" min="0" max="2" step="0.1" value={config.provider.temperature} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, temperature: Number(event.target.value) } }))} />
           </label>
         </section>
         <section>
           <h2>快捷键</h2>
-          {[
-            ['toggleDirectory', '目录'],
-            ['toggleReader', '正文'],
-            ['openSettings', '设置'],
-            ['closeMenu', '菜单']
-          ].map(([key, label]) => (
+          {([
+            ['toggleLeft', '目录'],
+            ['toggleRight', '正文'],
+            ['openContext', '上下文']
+          ] as const).map(([key, label]) => (
             <label key={key}>
               <span>{label}</span>
-              <input value={shortcuts[key] ?? ''} onChange={(event) => updateShortcut(key, event.target.value.slice(-12))} />
+              <input value={config.shortcuts[key]} onChange={(event) => onChange((draft) => ({ ...draft, shortcuts: { ...draft.shortcuts, [key]: event.target.value.slice(-1).toLowerCase() || draft.shortcuts[key] } }))} />
             </label>
           ))}
         </section>
+        <section>
+          <h2>Repository</h2>
+          <label>
+            <span>Mode</span>
+            <input readOnly value={binding?.activeSourceMode ?? config.repository.sourceMode} />
+          </label>
+          <label>
+            <span>Source</span>
+            <input readOnly value={binding?.sourceLabel ?? config.repository.mountedVaultPath ?? ''} />
+          </label>
+        </section>
         <section className="settings-wide">
-          <h2>提问</h2>
-          <div className="template-settings">
+          <h2>提问选项</h2>
+          <button className="settings-command" type="button" onClick={onAddTemplate}>
+            <Icon name="plus" />
+            <span>新增</span>
+          </button>
+          <div className="template-list">
             {templates.map((template) => (
-              <label key={template.id}>
-                <span style={{ color: template.color }}>{template.title}</span>
-                <input
-                  value={template.body}
-                  onChange={(event) =>
-                    onChange({
-                      ...config,
-                      templates: templates.map((item) =>
-                        item.id === template.id ? { ...item, body: event.target.value } : item
-                      )
-                    })
-                  }
-                />
-              </label>
+              <div className="template-row" key={template.id}>
+                <input value={template.title} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
+                <input value={template.body} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
+                <label className="inline-check">
+                  <input type="checkbox" checked={template.isEnabled} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
+                  <span>启用</span>
+                </label>
+              </div>
             ))}
           </div>
         </section>
       </div>
-      <div className="settings-statusbar">
-        <button type="button" onClick={onSave}>
+      <footer className="settings-footer">
+        <button className="settings-command primary" type="button" onClick={onSave}>
           <Icon name="save" />
           <span>保存</span>
         </button>
+      </footer>
+    </WindowFrame>
+  )
+}
+
+function DetailWindow({
+  open,
+  selectedText,
+  context,
+  onToggle
+}: {
+  open: boolean
+  selectedText: string
+  context: string
+  onToggle: () => void
+}) {
+  return (
+    <WindowFrame
+      className="detail-window"
+      title="详情"
+      collapsed={!open}
+      actions={<IconButton icon="chevronUp" label="收起" active={!open} onClick={onToggle} />}
+    >
+      <div className="detail-body">
+        <div>
+          <span>选中</span>
+          <p>{selectedText}</p>
+        </div>
+        <div>
+          <span>上下文</span>
+          <p>{makeSummary(context, 360)}</p>
+        </div>
       </div>
     </WindowFrame>
   )
 }
 
-function QaWindow({
+function QaWidget({
   widget,
-  templates,
-  fontPx,
+  record,
+  documents,
+  config,
   onFocus,
-  onCollapse,
+  onMove,
+  onResize,
+  onToggle,
   onClose,
-  onDelete
+  onDelete,
+  onAsk
 }: {
-  widget: QaWindowState
-  templates: PromptTemplate[]
-  fontPx: number
+  widget: WidgetState
+  record: QARecord | null
+  documents: DocumentNode[]
+  config: AppConfig
   onFocus: () => void
-  onCollapse: () => void
+  onMove: (x: number, y: number) => void
+  onResize: (w: number, h: number) => void
+  onToggle: () => void
   onClose: () => void
   onDelete: () => void
+  onAsk: (action: AskAction) => void
 }) {
-  const [detailCollapsed, setDetailCollapsed] = useState(true)
-  const record = widget.record
-  const title = templates.find((template) => template.id === record?.promptTemplateId)?.title || '问答'
-  const answerMarkdown = (record?.answerMarkdown || '正在等待回答。').replace(/^##\s*问题\s*\n+/, '')
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
+  const drag = (event: React.PointerEvent) => {
+    if ((event.target as HTMLElement).closest('button,input,textarea,.window-body')) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const sx = event.clientX
+    const sy = event.clientY
+    const ox = widget.position.x
+    const oy = widget.position.y
+    const move = (moveEvent: PointerEvent) => onMove(ox + moveEvent.clientX - sx, oy + moveEvent.clientY - sy)
+    const done = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+  }
+  const resize = (event: React.PointerEvent) => {
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const sx = event.clientX
+    const sy = event.clientY
+    const ow = widget.size.w
+    const oh = widget.size.h
+    const move = (moveEvent: PointerEvent) => onResize(Math.max(260, ow + moveEvent.clientX - sx), Math.max(220, oh + moveEvent.clientY - sy))
+    const done = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', done)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', done)
+  }
+  const sourceDocument = record?.sourceDocumentId ? documents.find((document) => document.id === record.sourceDocumentId) : null
+  const answerText = displayAnswerMarkdown(record?.answerMarkdown || (record?.answerStatus === 'pending' ? '等待回答...' : ''))
+  const title = record
+    ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || record.customPromptTitle || '问答'
+    : '问答'
+  const surfaceText = record ? markdownToPlainText(answerText) : ''
 
   return (
     <WindowFrame
       className="qa-window"
-      collapsed={widget.collapsed}
       title={title}
+      collapsed={widget.isCollapsed}
       style={{
-        left: widget.x,
-        top: widget.y,
-        width: widget.w,
-        height: widget.collapsed ? undefined : widget.h,
-        zIndex: widget.z
+        left: widget.position.x,
+        top: widget.position.y,
+        width: widget.size.w,
+        height: widget.isCollapsed ? undefined : widget.size.h,
+        zIndex: widget.zIndex
       }}
       actions={
         <>
-          <IconButton icon="chevronUp" label="收起" onClick={onCollapse} active={widget.collapsed} />
+          <IconButton icon="chevronUp" label="收起" active={widget.isCollapsed} onClick={onToggle} />
           <IconButton icon="close" label="关闭" onClick={onClose} />
-          <IconButton icon="trash" label="删除" onClick={onDelete} />
+          <IconButton icon="trash" label="删除" danger onClick={onDelete} />
         </>
       }
+      onMouseDown={onFocus}
     >
-      <div className="qa-content" style={{ fontSize: fontPx }} onMouseDown={onFocus}>
-        <WindowFrame
-          className="detail-subwindow"
-          title="详情"
-          collapsed={detailCollapsed}
-          actions={
-            <IconButton
-              icon="chevronUp"
-              label="收起"
-              onClick={() => setDetailCollapsed((value) => !value)}
-              active={detailCollapsed}
-            />
-          }
+      <div ref={ref} className="qa-inner" onPointerDown={drag}>
+        <DetailWindow
+          open={detailsOpen}
+          selectedText={record?.selectedText ?? ''}
+          context={record?.readingContextSnapshot ?? ''}
+          onToggle={() => setDetailsOpen((value) => !value)}
+        />
+        <div className="question-text">{record?.questionText}</div>
+        <article
+          className="markdown-body"
+          style={{ fontSize: config.rendering.widgetFontPx }}
+          onMouseUp={(event) => {
+            const action = record ? selectionAction({
+              eventPoint: { x: event.clientX, y: event.clientY + 8 },
+              surface: 'widget',
+              target: { widgetId: widget.id },
+              sourceQaRecordId: record.id,
+              surfaceTitle: title,
+              surfaceText
+            }) : null
+            if (action) onAsk(action)
+          }}
         >
-          <dl>
-            <dt>选中</dt>
-            <dd>{record?.selectedText}</dd>
-            <dt>上下文</dt>
-            <dd>{record?.readingContextMode}</dd>
-          </dl>
-        </WindowFrame>
-        <div className="question-direct">{record?.questionText}</div>
-        <article className="markdown-body">{formatMarkdown(answerMarkdown)}</article>
+          {markdownBlocks(answerText, sourceDocument?.path)}
+        </article>
+        {!widget.isCollapsed ? <button className="resize-corner" type="button" aria-label="resize" onPointerDown={resize} /> : null}
       </div>
     </WindowFrame>
   )
 }
 
 export function App() {
-  const [config, setConfig] = useState<AppConfig>(defaultConfig)
-  const [tree, setTree] = useState<TreeNode[]>([])
-  const [documentPath, setDocumentPath] = useState(defaultConfig().repository?.lastOpenedDocumentPath ?? '')
-  const [documentText, setDocumentText] = useState('')
-  const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [readerCollapsed, setReaderCollapsed] = useState(false)
-  const [readerMaximized, setReaderMaximized] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [repo, setRepo] = useState<RepoMeta | null>(null)
+  const [documents, setDocuments] = useState<DocumentNode[]>([])
+  const [nodes, setNodes] = useState<SidebarNode[]>([])
+  const [config, setConfig] = useState<AppConfig | null>(null)
+  const [canvas, setCanvas] = useState<CanvasState | null>(null)
+  const [records, setRecords] = useState<QARecord[]>([])
+  const [llmAccess, setLlmAccess] = useState<LlmAccessState | null>(null)
+  const [binding, setBinding] = useState<RepositoryBinding | null>(null)
+  const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [askMenu, setAskMenu] = useState<AskMenuState | null>(null)
-  const [floatingMenu, setFloatingMenu] = useState<FloatingMenuState | null>(null)
-  const [collapsedFolders, setCollapsedFolders] = useState<string[]>([])
-  const [qaWindows, setQaWindows] = useState<QaWindowState[]>([])
-  const [topZ, setTopZ] = useState(20)
-  const readerRef = useRef<HTMLDivElement | null>(null)
-  const vaultRoot = normalizeVaultPath(config)
+  const [floatingMenu, setFloatingMenu] = useState<MenuState | null>(null)
+  const [modal, setModal] = useState<ModalName>(null)
+  const [readerMaximized, setReaderMaximized] = useState(false)
+  const [persistState, setPersistState] = useState<'idle' | 'dirty' | 'saving' | 'error'>('idle')
+  const activeRuns = useRef(new Map<string, AbortController>())
+  const persistTimer = useRef<number | null>(null)
 
-  const templates = useMemo(
-    () => [...(config.templates ?? defaultConfig().templates ?? [])].filter((item) => item.isEnabled !== false).sort((a, b) => a.order - b.order),
-    [config.templates]
-  )
+  const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
+  const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] ?? null : null
+  const activeRecords = useMemo(() => records.filter((record) => !record.lifecycle.isDeleted), [records])
+  const templates = useMemo(() => sortTemplates(config?.templates ?? []).filter((template) => template.isEnabled), [config])
 
-  const persistConfig = useCallback(async (nextConfig: AppConfig) => {
-    await writeText('config.json', JSON.stringify(nextConfig, null, 2))
-  }, [])
+  const schedulePersist = useCallback((nextConfig: AppConfig | null, nextCanvas: CanvasState | null) => {
+    if (!nextConfig || !nextCanvas) return
+    if (persistTimer.current) window.clearTimeout(persistTimer.current)
+    setPersistState('dirty')
+    persistTimer.current = window.setTimeout(async () => {
+      setPersistState('saving')
+      try {
+        const version = await saveWorkspaceState({ config: nextConfig, canvas: nextCanvas, version: workspaceVersion })
+        setWorkspaceVersion(version)
+        setPersistState('idle')
+      } catch (saveError) {
+        console.error(saveError)
+        setPersistState('error')
+      }
+    }, nextConfig.storage.autoSaveMs || PERSIST_DELAY_MS)
+  }, [workspaceVersion])
 
-  const persistCanvas = useCallback(async (windows: QaWindowState[]) => {
-    const canvas: CanvasFile = {
-      id: 'main',
-      viewport: { x: 0, y: 0, zoom: 1 },
-      widgetStates: windows.map((windowState) => ({
-        id: windowState.id,
-        position: { x: windowState.x, y: windowState.y },
-        size: { w: windowState.w, h: windowState.h },
-        zIndex: windowState.z,
-        isCollapsed: windowState.collapsed,
-        type: 'qa-record',
-        props: { qaRecordId: windowState.recordId }
-      })),
-      selection: windows[0] ? { widgetId: windows[0].id } : undefined,
-      updatedAt: new Date().toISOString()
-    }
-    await writeText('records/canvas/main.json', JSON.stringify(canvas, null, 2))
-  }, [])
+  const updateConfig = (updater: (draft: AppConfig) => AppConfig) => {
+    setConfig((previous) => {
+      if (!previous) return previous
+      const next = updater(previous)
+      schedulePersist(next, canvas)
+      return next
+    })
+  }
+
+  const updateCanvas = (updater: (draft: CanvasState) => CanvasState, immediate = false) => {
+    setCanvas((previous) => {
+      if (!previous) return previous
+      const next = { ...updater(previous), updatedAt: new Date().toISOString() }
+      if (immediate) {
+        void saveWorkspaceState({ config: config!, canvas: next, version: workspaceVersion }).catch(console.error)
+      } else {
+        schedulePersist(config, next)
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
     async function boot() {
-      const loadedConfig = await readJson<AppConfig>('config.json', defaultConfig())
-      if (cancelled) return
-      const mergedConfig = { ...defaultConfig(), ...loadedConfig }
-      const root = normalizeVaultPath(mergedConfig)
-      setConfig(mergedConfig)
-      setLeftCollapsed(Boolean(mergedConfig.layout?.leftSidebarCollapsed))
-      setCollapsedFolders(mergedConfig.navigation?.collapsedSidebarFolderIds ?? [])
-      setDocumentPath(mergedConfig.repository?.lastOpenedDocumentPath || defaultConfig().repository?.lastOpenedDocumentPath || '')
-      setTree(await readTree(root))
-
-      const canvas = await readJson<CanvasFile>('records/canvas/main.json', defaultCanvas())
-      const bootLeftWidth = mergedConfig.layout?.leftSidebarCollapsed ? RAIL_WIDTH : SIDEBAR_WIDTH
-      const windows = await Promise.all(
-        canvas.widgetStates
-          .filter((widget) => widget.type === 'qa-record' && widget.props.qaRecordId)
-          .map(async (widget) => {
-            const record = await readJson<QaRecord | null>(`records/qa/${widget.props.qaRecordId}.json`, null)
-            const width = clamp(widget.size.w, 320, Math.max(360, window.innerWidth - bootLeftWidth - 40))
-            const height = clamp(widget.size.h, 260, Math.max(320, window.innerHeight - 70))
-            return {
-              id: widget.id,
-              recordId: widget.props.qaRecordId || '',
-              x: clamp(widget.position.x, bootLeftWidth + 20, Math.max(bootLeftWidth + 20, window.innerWidth - width - 20)),
-              y: clamp(widget.position.y, 48, Math.max(48, window.innerHeight - height - 20)),
-              w: width,
-              h: height,
-              z: widget.zIndex,
-              collapsed: widget.isCollapsed,
-              record: record && !record.lifecycle?.isDeleted ? record : undefined
-            }
-          })
-      )
-      if (!cancelled) {
-        const visibleWindows = windows.filter((widget) => widget.record)
-        setQaWindows(visibleWindows)
-        setTopZ(Math.max(20, ...visibleWindows.map((widget) => widget.z + 1)))
+      try {
+        setLoading(true)
+        const snapshot: WorkspaceSnapshot = await bootstrapWorkspace()
+        if (cancelled) return
+        setRepo(snapshot.repo)
+        setDocuments(snapshot.documents)
+        setNodes(snapshot.sidebarNodes)
+        setConfig({ ...snapshot.config, templates: applyPromptTemplateDefaults(snapshot.config.templates) })
+        setCanvas({ ...snapshot.canvas, viewport: normalizeCanvasViewport(snapshot.canvas.viewport) })
+        setRecords(snapshot.qaRecords)
+        setLlmAccess(snapshot.llmAccess ?? null)
+        setBinding(snapshot.repositoryBinding)
+        setWorkspaceVersion(snapshot.workspaceVersion ?? 0)
+      } catch (bootError) {
+        console.error(bootError)
+        setError(bootError instanceof Error ? bootError.message : 'Workspace failed to load')
+      } finally {
+        setLoading(false)
       }
     }
     void boot()
     return () => {
       cancelled = true
+      activeRuns.current.forEach((controller) => controller.abort())
     }
   }, [])
 
   useEffect(() => {
-    if (!documentPath) return
-    void readText(`${vaultRoot}/${documentPath}`, '# 未找到正文').then(setDocumentText)
-  }, [documentPath, vaultRoot])
-
-  useEffect(() => {
+    if (!config) return
     const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
       const key = event.key.toLowerCase()
-      const shortcuts = config.shortcuts ?? {}
-      if (key === (shortcuts.closeMenu || 'escape')) {
+      if (key === config.shortcuts.toggleLeft) {
+        event.preventDefault()
+        updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))
+      } else if (key === config.shortcuts.toggleRight) {
+        event.preventDefault()
+        updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))
+      } else if (key === config.shortcuts.openContext) {
+        event.preventDefault()
+        setModal('settings')
+      } else if (key === 'escape') {
         setAskMenu(null)
         setFloatingMenu(null)
+        setModal(null)
       }
-      if (key === (shortcuts.toggleDirectory || 'f')) setLeftCollapsed((value) => !value)
-      if (key === (shortcuts.toggleReader || 'v')) setReaderCollapsed((value) => !value)
-      if (key === (shortcuts.openSettings || ',')) setSettingsOpen(true)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [config.shortcuts])
+  }, [config])
 
-  const saveConfig = useCallback(
-    async (nextConfig: AppConfig) => {
-      setConfig(nextConfig)
-      await persistConfig(nextConfig)
-    },
-    [persistConfig]
-  )
-
-  const openDocument = async (path: string) => {
-    setDocumentPath(path)
-    const nextConfig = {
-      ...config,
-      repository: { ...config.repository, mountedVaultPath: vaultRoot, lastOpenedDocumentPath: path }
+  async function openDocument(documentId: string) {
+    if (!repo || !config) return
+    const document = documentMap.get(documentId)
+    if (binding?.activeSourceMode === 'remote-library' && document && !document.isContentLoaded && binding.libraryId) {
+      try {
+        const loaded = await fetchRemoteDocument(documentId, binding.libraryId)
+        setDocuments((previous) => previous.map((item) => item.id === documentId ? loaded : item))
+      } catch (loadError) {
+        console.error(loadError)
+      }
     }
-    setConfig(nextConfig)
-    void persistConfig(nextConfig)
+    setRepo({ ...repo, currentDocumentId: documentId, updatedAt: new Date().toISOString() })
+    if (document) {
+      updateConfig((draft) => ({
+        ...draft,
+        repository: { ...draft.repository, lastOpenedDocumentPath: document.path }
+      }))
+    }
   }
 
-  const toggleFolder = (folderId: string) => {
-    const next = collapsedFolders.includes(folderId)
-      ? collapsedFolders.filter((item) => item !== folderId)
-      : [...collapsedFolders, folderId]
-    setCollapsedFolders(next)
-    const nextConfig = {
-      ...config,
-      navigation: { ...config.navigation, collapsedSidebarFolderIds: next }
-    }
-    setConfig(nextConfig)
-    void persistConfig(nextConfig)
-  }
-
-  const onReaderMouseUp = () => {
-    const selection = window.getSelection()
-    const text = selection?.toString().trim()
-    if (!selection || !text || !readerRef.current?.contains(selection.anchorNode)) return
-    const range = selection.getRangeAt(0)
-    const rect = range.getBoundingClientRect()
-    setAskMenu({ x: rect.left, y: rect.bottom + 8, text })
-  }
-
-  const createQa = async (template: PromptTemplate, selectedText: string) => {
-    const now = new Date().toISOString()
-    const recordId = id()
-    const context = stripMarkdown(documentText).slice(0, 1600)
-    const record: QaRecord = {
-      id: recordId,
-      sourceSurface: 'reader',
-      sourceDocumentId: documentPath,
-      selectedText,
-      promptTemplateId: template.id,
-      promptIntent: 'custom',
-      systemStatePrompt: '你是 AnyReader 的阅读助理。',
-      readingContextMode: 'section',
-      readingContextSnapshot: context,
-      fullPrompt: `状态提示词：\n你是 AnyReader 的阅读助理。\n\n阅读视野上下文（当前小节）：\n${context}\n\n提问：\n${template.body}\n\n被选中的文本：\n${selectedText}`,
-      questionText: template.body,
-      answerMarkdown: `## 回答\n\n选中的内容是：${selectedText}\n\n${template.body}\n\n当前上下文来自 ${toDocumentTitle(documentPath)}。这里保留原有问答记录格式，新的窗口只负责展示与管理。`,
-      answerStatus: 'done',
-      modelInfo: {
-        provider: config.provider?.baseUrl ? 'OpenAI Compatible' : 'Demo Answer',
-        model: config.provider?.model || 'gpt-4.1-mini',
-        temperature: config.provider?.temperature ?? 0.3
-      },
-      visualStyle: {
-        color: template.color,
-        markerType: 'underline'
-      },
-      lifecycle: { isDeleted: false },
-      createdAt: now,
-      updatedAt: now
-    }
-    const nextZ = topZ + 1
-    const windowState: QaWindowState = {
-      id: `widget_${crypto.randomUUID()}`,
-      recordId,
-      x: Math.max((leftCollapsed ? RAIL_WIDTH : SIDEBAR_WIDTH) + 48, window.innerWidth - 560),
-      y: 90 + qaWindows.length * 22,
-      w: 440,
-      h: 520,
-      z: nextZ,
-      collapsed: false,
-      record
-    }
-    const nextWindows = [...qaWindows, windowState]
-    setTopZ(nextZ + 1)
-    setQaWindows(nextWindows)
-    setAskMenu(null)
-    window.getSelection()?.removeAllRanges()
-    await writeText(`records/qa/${recordId}.json`, JSON.stringify(record, null, 2))
-    await persistCanvas(nextWindows)
-  }
-
-  const updateQaWindows = (updater: (widgets: QaWindowState[]) => QaWindowState[]) => {
-    setQaWindows((current) => {
-      const next = updater(current)
-      void persistCanvas(next)
-      return next
+  function openAsk(action: AskAction) {
+    if (!config) return
+    const session = buildPendingAskSession({
+      ...action,
+      learningPrompt: action.learningPrompt ?? config.learning.prompt
     })
+    setAskMenu({ session, hoveredTemplateId: templates[0]?.id ?? null })
   }
 
-  const focusQa = (widgetId: string) => {
-    const nextZ = topZ + 1
-    setTopZ(nextZ)
-    updateQaWindows((widgets) => widgets.map((widget) => (widget.id === widgetId ? { ...widget, z: nextZ } : widget)))
+  function openWidget(factory: (draft: CanvasState) => WidgetState) {
+    if (!canvas) return
+    updateCanvas((draft) => {
+      const widget = factory(draft)
+      return {
+        ...draft,
+        widgetStates: [...draft.widgetStates, widget],
+        selection: { widgetId: widget.id }
+      }
+    }, true)
   }
 
-  const deleteQa = async (widget: QaWindowState) => {
-    if (widget.record) {
-      const record = {
-        ...widget.record,
-        lifecycle: { isDeleted: true, deletedAt: new Date().toISOString() },
+  async function runRecord(seed: QARecord) {
+    if (!config) return
+    const controller = new AbortController()
+    activeRuns.current.set(seed.id, controller)
+    let text = ''
+    let firstTokenAt: string | undefined
+    let modelInfo: QARecord['modelInfo'] = buildModelInfo(config)
+    const startedAt = Date.now()
+    try {
+      for await (const chunk of streamAnswer({
+        config,
+        qaRecord: seed,
+        signal: controller.signal,
+        onModelInfo: (next) => {
+          modelInfo = next
+        }
+      })) {
+        if (!firstTokenAt) firstTokenAt = new Date().toISOString()
+        text += chunk
+        const next: QARecord = {
+          ...seed,
+          answerMarkdown: text,
+          answerStatus: 'streaming',
+          modelInfo,
+          timing: { ...seed.timing, firstTokenAt },
+          updatedAt: new Date().toISOString()
+        }
+        setRecords((previous) => upsertQaRecord(previous, next))
+      }
+      const done: QARecord = {
+        ...seed,
+        answerMarkdown: text,
+        answerStatus: 'done',
+        modelInfo,
+        timing: { ...seed.timing, firstTokenAt, completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt },
         updatedAt: new Date().toISOString()
       }
-      await writeText(`records/qa/${widget.recordId}.json`, JSON.stringify(record, null, 2))
+      setRecords((previous) => upsertQaRecord(previous, done))
+      await saveQaRecord(done)
+    } catch (runError) {
+      if (isAbortError(runError)) return
+      const failed: QARecord = {
+        ...seed,
+        answerMarkdown: runError instanceof Error ? runError.message : 'Answer failed',
+        answerStatus: 'error',
+        modelInfo,
+        updatedAt: new Date().toISOString()
+      }
+      setRecords((previous) => upsertQaRecord(previous, failed))
+      await saveQaRecord(failed)
+    } finally {
+      activeRuns.current.delete(seed.id)
     }
-    updateQaWindows((widgets) => widgets.filter((item) => item.id !== widget.id))
   }
 
-  const leftWidth = leftCollapsed ? RAIL_WIDTH : SIDEBAR_WIDTH
+  async function askTemplate(template: PromptTemplate) {
+    if (!askMenu || !config || !repo || !canvas) return
+    const record = createPendingRecord({
+      action: askMenu.session.action,
+      config,
+      repo,
+      documents,
+      canvasId: canvas.id || MAIN_CANVAS_ID,
+      template,
+      sourceParentRecord: askMenu.session.action.sourceQaRecordId
+        ? activeRecords.find((record) => record.id === askMenu.session.action.sourceQaRecordId) ?? null
+        : null
+    })
+    setAskMenu(null)
+    setRecords((previous) => upsertQaRecord(previous, record))
+    await saveQaRecord(record)
+    openWidget((draft) => ({
+      ...nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight }),
+      type: 'qa-record',
+      props: { qaRecordId: record.id }
+    }))
+    void runRecord(record)
+  }
+
+  async function removeRecord(record: QARecord | null, widgetId: string) {
+    if (record) {
+      activeRuns.current.get(record.id)?.abort()
+      const deleted = { ...record, lifecycle: { ...record.lifecycle, isDeleted: true, deletedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() }
+      setRecords((previous) => upsertQaRecord(previous, deleted))
+      await deleteQaRecord(deleted)
+    }
+    updateCanvas((draft) => ({
+      ...draft,
+      widgetStates: draft.widgetStates.filter((widget) => widget.id !== widgetId),
+      selection: { widgetId: draft.selection?.widgetId === widgetId ? null : draft.selection?.widgetId ?? null }
+    }))
+  }
+
+  if (loading) return <div className="boot">Loading workspace...</div>
+  if (error || !repo || !config || !canvas || !currentDocument) return <div className="boot">{error ?? 'Missing workspace state'}</div>
+
+  const leftWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : config.layout.leftSidebarWidth || LEFT_DEFAULT
   const readerLeft = leftWidth
-  const readerWidth = readerCollapsed ? RAIL_WIDTH : readerMaximized ? `calc(100vw - ${readerLeft}px)` : 'min(820px, calc(100vw - 360px))'
+  const readerWidth = config.layout.rightSidebarCollapsed ? RAIL_WIDTH : readerMaximized ? `calc(100vw - ${readerLeft}px)` : READER_WIDTH
+  const viewport = normalizeCanvasViewport(canvas.viewport)
+  const visibleWidgets = canvas.widgetStates.filter((widget) => {
+    if (widget.type === 'ask') return true
+    return activeRecords.some((record) => record.id === widget.props.qaRecordId)
+  })
 
   return (
     <main className="app-canvas">
       <div className="canvas-grid" />
+      <div
+        className="canvas-scene"
+        style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
+        onPointerDown={(event) => {
+          if ((event.target as HTMLElement).closest('.window-frame')) return
+          const start = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }
+          const move = (moveEvent: PointerEvent) => updateCanvas((draft) => ({ ...draft, viewport: { ...draft.viewport, x: start.vx + moveEvent.clientX - start.x, y: start.vy + moveEvent.clientY - start.y } }))
+          const done = () => {
+            window.removeEventListener('pointermove', move)
+            window.removeEventListener('pointerup', done)
+          }
+          window.addEventListener('pointermove', move)
+          window.addEventListener('pointerup', done)
+        }}
+      >
+        {visibleWidgets.map((widget) => {
+          const record = widget.type === 'qa-record' ? activeRecords.find((item) => item.id === widget.props.qaRecordId) ?? null : null
+          return (
+            <QaWidget
+              key={widget.id}
+              widget={widget}
+              record={record}
+              documents={documents}
+              config={config}
+              onFocus={() => updateCanvas((draft) => {
+                const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
+                return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
+              })}
+              onMove={(x, y) => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, position: { x, y } } : item) }))}
+              onResize={(w, h) => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, size: { w, h } } : item) }))}
+              onToggle={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, isCollapsed: !item.isCollapsed } : item) }))}
+              onClose={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))}
+              onDelete={() => void removeRecord(record, widget.id)}
+              onAsk={openAsk}
+            />
+          )
+        })}
+      </div>
 
       <WindowFrame
         className="directory-window"
-        collapsed={leftCollapsed}
+        collapsed={config.layout.leftSidebarCollapsed}
         title={<Logo />}
-        style={{ left: 0, top: 0, width: leftWidth, height: '100vh' }}
-        actions={
-          <IconButton
-            icon={leftCollapsed ? 'chevronRight' : 'chevronLeft'}
-            label={leftCollapsed ? '展开目录' : '收起目录'}
-            onClick={() => setLeftCollapsed((value) => !value)}
-          />
-        }
+        style={{ left: 0, top: 0, width: leftWidth, height: '100vh', zIndex: 20 }}
+        actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
       >
-        <div className="directory-content">
-          <TreeView
-            nodes={tree}
-            rootPath={vaultRoot}
-            selectedPath={documentPath}
-            collapsedFolders={collapsedFolders}
-            onToggleFolder={toggleFolder}
+        <div className="directory-body">
+          <Sidebar
+            repo={repo}
+            nodes={nodes}
+            documents={documents}
+            currentDocumentId={currentDocument.id}
+            collapsedIds={config.navigation.collapsedSidebarFolderIds}
+            onToggle={(nodeId) => updateConfig((draft) => {
+              const exists = draft.navigation.collapsedSidebarFolderIds.includes(nodeId)
+              return { ...draft, navigation: { ...draft.navigation, collapsedSidebarFolderIds: exists ? draft.navigation.collapsedSidebarFolderIds.filter((id) => id !== nodeId) : [...draft.navigation.collapsedSidebarFolderIds, nodeId] } }
+            })}
             onOpen={openDocument}
+            onAsk={openAsk}
           />
-          <DirectoryFooter
-            config={config}
-            onMenu={setFloatingMenu}
-            onSettings={() => {
-              setFloatingMenu(null)
-              setSettingsOpen(true)
-            }}
-          />
+          <footer className="directory-footer">
+            <button
+              type="button"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect()
+                setFloatingMenu({ kind: 'model', x: rect.left, y: rect.top })
+              }}
+            >
+              <Icon name="spark" />
+              <span>{llmAccess?.dailyRemaining ?? llmAccess?.creditBalance ?? config.provider.model}</span>
+            </button>
+            <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
+          </footer>
         </div>
       </WindowFrame>
 
       <WindowFrame
         className="reader-window"
-        collapsed={readerCollapsed}
-        title={<span className="reader-title-spacer" />}
-        style={{ left: readerLeft, top: 0, width: readerWidth, height: '100vh' }}
+        collapsed={config.layout.rightSidebarCollapsed}
+        title={<span />}
+        style={{ left: readerLeft, top: 0, width: readerWidth, height: '100vh', zIndex: 18 }}
         actions={
           <>
-            <IconButton
-              icon={readerCollapsed ? 'chevronRight' : 'chevronLeft'}
-              label={readerCollapsed ? '展开正文' : '收起正文'}
-              onClick={() => setReaderCollapsed((value) => !value)}
-            />
-            <IconButton
-              icon="maximize"
-              label="最大化"
-              active={readerMaximized}
-              onClick={() => setReaderMaximized((value) => !value)}
-            />
+            <IconButton icon={config.layout.rightSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="正文" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))} />
+            <IconButton icon="maximize" label="最大化" active={readerMaximized} onClick={() => setReaderMaximized((value) => !value)} />
           </>
         }
       >
         <article
-          ref={readerRef}
-          className="reader-article markdown-body"
-          style={{ fontSize: config.rendering?.readerFontPx ?? 16 }}
-          onMouseUp={onReaderMouseUp}
+          className="reader-body markdown-body"
+          style={{ fontSize: config.rendering.readerFontPx }}
+          onMouseUp={(event) => {
+            const action = selectionAction({
+              eventPoint: { x: event.clientX, y: event.clientY + 8 },
+              surface: 'reader',
+              target: { documentId: currentDocument.id },
+              surfaceTitle: titleForDocument(currentDocument),
+              surfaceText: plainContextForDocument(currentDocument)
+            })
+            if (action) openAsk(action)
+          }}
         >
-          <div className="reader-path">{documentPath}</div>
-          <h1>{toDocumentTitle(documentPath)}</h1>
-          <div className="annotation-sample">
-            <span>已标注</span>
-            <mark>选中内容会以 VS Code 风格下划线标识</mark>
-          </div>
-          {formatMarkdown(documentText, documentPath)}
+          <div className="reader-path">{currentDocument.path}</div>
+          {markdownBlocks(currentDocument.contentMd, currentDocument.path)}
         </article>
       </WindowFrame>
 
-      {qaWindows.map((widget) => (
-        <QaWindow
-          key={widget.id}
-          widget={widget}
+      {askMenu ? (
+        <AskMenu
+          state={askMenu}
           templates={templates}
-          fontPx={config.rendering?.widgetFontPx ?? 15}
-          onFocus={() => focusQa(widget.id)}
-          onCollapse={() =>
-            updateQaWindows((widgets) =>
-              widgets.map((item) => (item.id === widget.id ? { ...item, collapsed: !item.collapsed } : item))
-            )
-          }
-          onClose={() => updateQaWindows((widgets) => widgets.filter((item) => item.id !== widget.id))}
-          onDelete={() => void deleteQa(widget)}
-        />
-      ))}
-
-      {settingsOpen ? (
-        <SettingsWindow
-          config={config}
-          onClose={() => setSettingsOpen(false)}
-          onChange={setConfig}
-          onSave={() => void saveConfig(config)}
+          onHover={(templateId) => setAskMenu((current) => current ? { ...current, hoveredTemplateId: templateId } : current)}
+          onPick={(template) => void askTemplate(template)}
+          onClose={() => setAskMenu(null)}
         />
       ) : null}
 
-      {askMenu ? <AskMenu state={askMenu} templates={templates} onPick={createQa} onClose={() => setAskMenu(null)} /> : null}
       {floatingMenu ? (
         <FloatingMenu
           state={floatingMenu}
           config={config}
+          llmAccess={llmAccess}
           onClose={() => setFloatingMenu(null)}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={() => setModal('settings')}
+          onSelectModel={(modelId) => updateConfig((draft) => ({ ...draft, provider: { ...draft.provider, model: modelId } }))}
         />
       ) : null}
+
+      {modal === 'settings' ? (
+        <SettingsWindow
+          config={config}
+          binding={binding}
+          onClose={() => setModal(null)}
+          onChange={updateConfig}
+          onSave={() => void saveWorkspaceState({ config, canvas, version: workspaceVersion })}
+          onAddTemplate={() => updateConfig((draft) => ({
+            ...draft,
+            templates: [
+              ...draft.templates,
+              {
+                id: createId('template'),
+                title: '新选项',
+                body: '输入提示词。',
+                color: '#569cd6',
+                order: draft.templates.length,
+                isBuiltIn: false,
+                isEnabled: true,
+                scope: 'global'
+              }
+            ]
+          }))}
+        />
+      ) : null}
+
+      <div className={`persist-status ${persistState}`}>{persistState}</div>
     </main>
   )
 }
