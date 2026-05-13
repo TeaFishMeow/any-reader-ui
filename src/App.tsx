@@ -569,7 +569,7 @@ function DetailWindow({
       className="detail-window"
       title="详情"
       collapsed={!open}
-      actions={<IconButton icon="chevronUp" label="收起" active={!open} onClick={onToggle} />}
+      actions={<IconButton icon={open ? 'chevronUp' : 'chevronDown'} label="收起" active={!open} onClick={onToggle} />}
     >
       <div className="detail-body">
         <div>
@@ -663,9 +663,9 @@ function QaWidget({
       }}
       actions={
         <>
-          <IconButton icon="chevronUp" label="收起" active={widget.isCollapsed} onClick={onToggle} />
-          <IconButton icon="close" label="关闭" onClick={onClose} />
+          <IconButton icon={widget.isCollapsed ? 'chevronDown' : 'chevronUp'} label="收起" active={widget.isCollapsed} onClick={onToggle} />
           <IconButton icon="trash" label="删除" danger onClick={onDelete} />
+          <IconButton icon="close" label="关闭" onClick={onClose} />
         </>
       }
       onMouseDown={onFocus}
