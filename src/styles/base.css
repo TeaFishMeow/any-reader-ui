@@ -1,0 +1,91 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  --canvas: #1e1e1e;
+  --panel: #252526;
+  --panel-2: #1e1e1e;
+  --title: #2d2d30;
+  --hover: #37373d;
+  --line: #3c3c3c;
+  --line-soft: #333333;
+  --text: #cccccc;
+  --muted: #8f8f8f;
+  --accent: #007acc;
+  --accent-soft: #04395e;
+  --danger: #f14c4c;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --icon-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--text);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+svg {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+}
+
+svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.45;
+}
+
+.boot {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--canvas);
+  color: var(--text);
+}
+
+.app-canvas {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.canvas-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.canvas-scene {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}

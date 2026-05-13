@@ -1,0 +1,183 @@
+.ask-menu,
+.floating-menu {
+  position: fixed;
+  z-index: 100;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.ask-menu {
+  display: grid;
+  width: 320px;
+  padding: 4px;
+}
+
+.ask-menu button,
+.floating-menu button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.floating-menu button {
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+}
+
+.ask-menu button:hover,
+.ask-menu button:focus-visible,
+.ask-menu button.is-hovered,
+.floating-menu button:hover,
+.floating-menu button:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.ask-menu span,
+.ask-menu small,
+.floating-menu span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ask-menu span {
+  font-weight: 600;
+}
+
+.ask-menu small {
+  color: var(--muted);
+}
+
+.settings-window {
+  left: 50%;
+  top: 56px;
+  width: min(820px, calc(100vw - 72px));
+  height: min(700px, calc(100vh - 112px));
+  z-index: 120;
+  transform: translateX(-50%);
+  box-shadow: var(--shadow);
+}
+
+.settings-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  height: calc(100% - 35px);
+  overflow: auto;
+  padding: 16px;
+}
+
+.settings-body section {
+  min-width: 0;
+}
+
+.settings-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-body h2 {
+  margin: 0 0 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+  color: #eeeeee;
+  font-size: 13px;
+}
+
+.settings-body label,
+.template-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.template-row {
+  grid-template-columns: 140px minmax(0, 1fr) 80px;
+}
+
+.settings-body label span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-body input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.settings-body input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.inline-check {
+  display: inline-flex !important;
+  grid-template-columns: auto auto !important;
+  border-bottom: 0 !important;
+}
+
+.inline-check input {
+  width: auto;
+}
+
+.template-list {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.settings-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: var(--title);
+  color: var(--text);
+}
+
+.settings-command.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  height: 35px;
+  padding: 3px 8px;
+  border-top: 1px solid var(--line);
+  background: var(--title);
+}
+
+.persist-status {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  z-index: 150;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.persist-status.error {
+  color: var(--danger);
+}

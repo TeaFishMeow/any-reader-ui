@@ -1,0 +1,27 @@
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5f5f5f;
+  border: 2px solid #1e1e1e;
+}
+
+@media (max-width: 860px) {
+  .reader-body {
+    padding: 22px 24px 64px;
+  }
+
+  .settings-body {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-wide {
+    grid-column: 1;
+  }
+}
