@@ -82,7 +82,7 @@ export function Sidebar({
           onClick={() => node.type === 'document' ? onOpen(node.documentId ?? node.id) : expandable ? onToggle(node.id) : undefined}
           onContextMenu={(event) => openNodeMenu(event, node)}
         >
-          <Icon name={node.type === 'document' ? 'file' : 'folder'} />
+          {node.type === 'document' ? <span className="tree-icon-placeholder" aria-hidden="true" /> : <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} />}
           <span>{node.label}</span>
         </button>
         {expandable && !collapsed ? <ul>{children.map((child) => renderNode(child, depth + 1))}</ul> : null}

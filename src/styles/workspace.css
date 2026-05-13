@@ -67,6 +67,12 @@
   flex: 0 0 var(--icon-size);
 }
 
+.tree-icon-placeholder {
+  flex: 0 0 var(--icon-size);
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
+
 .tree-item:hover,
 .tree-item:focus-visible,
 .tree-item.is-active {
