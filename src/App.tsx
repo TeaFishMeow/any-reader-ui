@@ -46,6 +46,8 @@ type IconName =
   | 'minus'
 
 type ModalName = 'settings' | null
+type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+type ResizeFrame = { x: number; y: number; w: number; h: number }
 
 interface AskMenuState {
   session: ReturnType<typeof buildPendingAskSession>
@@ -62,6 +64,7 @@ const LEFT_DEFAULT = 280
 const RAIL_WIDTH = 36
 const READER_WIDTH = 780
 const PERSIST_DELAY_MS = 450
+const VIEWPORT_HEIGHT = () => (typeof window === 'undefined' ? 720 : window.innerHeight)
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
@@ -140,6 +143,53 @@ function IconButton({
   )
 }
 
+function resizeFrame(handle: ResizeHandle, frame: ResizeFrame, dx: number, dy: number, minW = 260, minH = 220) {
+  const west = handle.includes('w')
+  const east = handle.includes('e')
+  const north = handle.includes('n')
+  const south = handle.includes('s')
+  const nextW = Math.max(minW, frame.w + (east ? dx : 0) - (west ? dx : 0))
+  const nextH = Math.max(minH, frame.h + (south ? dy : 0) - (north ? dy : 0))
+  return {
+    x: west ? frame.x + frame.w - nextW : frame.x,
+    y: north ? frame.y + frame.h - nextH : frame.y,
+    w: nextW,
+    h: nextH
+  }
+}
+
+function ResizeHandles({ onResize }: { onResize: (handle: ResizeHandle, dx: number, dy: number) => void }) {
+  const handles: ResizeHandle[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
+  return (
+    <>
+      {handles.map((handle) => (
+        <button
+          key={handle}
+          type="button"
+          className={`resize-handle resize-handle-${handle}`}
+          aria-label="调整窗口大小"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            const startX = event.clientX
+            const startY = event.clientY
+            const move = (moveEvent: PointerEvent) => onResize(handle, moveEvent.clientX - startX, moveEvent.clientY - startY)
+            const done = () => {
+              window.removeEventListener('pointermove', move)
+              window.removeEventListener('pointerup', done)
+              window.removeEventListener('pointercancel', done)
+            }
+            window.addEventListener('pointermove', move)
+            window.addEventListener('pointerup', done)
+            window.addEventListener('pointercancel', done)
+          }}
+        />
+      ))}
+    </>
+  )
+}
+
 function WindowFrame({
   title,
   actions,
@@ -147,6 +197,7 @@ function WindowFrame({
   collapsed,
   style,
   onMouseDown,
+  onResize,
   children
 }: {
   title?: ReactNode
@@ -155,6 +206,7 @@ function WindowFrame({
   collapsed?: boolean
   style?: CSSProperties
   onMouseDown?: () => void
+  onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
   children: ReactNode
 }) {
   return (
@@ -164,6 +216,7 @@ function WindowFrame({
         <div className="window-actions">{actions}</div>
       </header>
       {!collapsed ? <div className="window-body">{children}</div> : null}
+      {!collapsed && onResize ? <ResizeHandles onResize={onResize} /> : null}
     </section>
   )
 }
@@ -460,17 +513,21 @@ function FloatingMenu({
 function SettingsWindow({
   config,
   binding,
+  frame,
   onClose,
   onChange,
   onSave,
-  onAddTemplate
+  onAddTemplate,
+  onResize
 }: {
   config: AppConfig
   binding: RepositoryBinding | null
+  frame: ResizeFrame
   onClose: () => void
   onChange: (updater: (config: AppConfig) => AppConfig) => void
   onSave: () => void
   onAddTemplate: () => void
+  onResize: (handle: ResizeHandle, dx: number, dy: number) => void
 }) {
   const templates = sortTemplates(config.templates)
   return (
@@ -478,6 +535,8 @@ function SettingsWindow({
       className="settings-window"
       title="设置"
       actions={<IconButton icon="close" label="关闭" onClick={onClose} />}
+      style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h, transform: 'none' }}
+      onResize={onResize}
     >
       <div className="settings-body">
         <section>
@@ -591,8 +650,7 @@ function QaWidget({
   documents,
   config,
   onFocus,
-  onMove,
-  onResize,
+  onFrameChange,
   onToggle,
   onClose,
   onDelete,
@@ -603,8 +661,7 @@ function QaWidget({
   documents: DocumentNode[]
   config: AppConfig
   onFocus: () => void
-  onMove: (x: number, y: number) => void
-  onResize: (w: number, h: number) => void
+  onFrameChange: (frame: ResizeFrame) => void
   onToggle: () => void
   onClose: () => void
   onDelete: () => void
@@ -619,22 +676,13 @@ function QaWidget({
     const sy = event.clientY
     const ox = widget.position.x
     const oy = widget.position.y
-    const move = (moveEvent: PointerEvent) => onMove(ox + moveEvent.clientX - sx, oy + moveEvent.clientY - sy)
-    const done = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', done)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', done)
-  }
-  const resize = (event: React.PointerEvent) => {
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    const sx = event.clientX
-    const sy = event.clientY
-    const ow = widget.size.w
-    const oh = widget.size.h
-    const move = (moveEvent: PointerEvent) => onResize(Math.max(260, ow + moveEvent.clientX - sx), Math.max(220, oh + moveEvent.clientY - sy))
+    const move = (moveEvent: PointerEvent) =>
+      onFrameChange({
+        x: ox + moveEvent.clientX - sx,
+        y: oy + moveEvent.clientY - sy,
+        w: widget.size.w,
+        h: widget.size.h
+      })
     const done = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', done)
@@ -661,6 +709,14 @@ function QaWidget({
         height: widget.isCollapsed ? undefined : widget.size.h,
         zIndex: widget.zIndex
       }}
+      onResize={(handle, dx, dy) =>
+        onFrameChange(resizeFrame(handle, {
+          x: widget.position.x,
+          y: widget.position.y,
+          w: widget.size.w,
+          h: widget.size.h
+        }, dx, dy))
+      }
       actions={
         <>
           <IconButton icon={widget.isCollapsed ? 'chevronDown' : 'chevronUp'} label="收起" active={widget.isCollapsed} onClick={onToggle} />
@@ -695,7 +751,6 @@ function QaWidget({
         >
           {markdownBlocks(answerText, sourceDocument?.path)}
         </article>
-        {!widget.isCollapsed ? <button className="resize-corner" type="button" aria-label="resize" onPointerDown={resize} /> : null}
       </div>
     </WindowFrame>
   )
@@ -717,6 +772,14 @@ export function App() {
   const [floatingMenu, setFloatingMenu] = useState<MenuState | null>(null)
   const [modal, setModal] = useState<ModalName>(null)
   const [readerMaximized, setReaderMaximized] = useState(false)
+  const [directoryFrame, setDirectoryFrame] = useState<ResizeFrame>({ x: 0, y: 0, w: LEFT_DEFAULT, h: VIEWPORT_HEIGHT() })
+  const [readerFrame, setReaderFrame] = useState<ResizeFrame>({ x: LEFT_DEFAULT, y: 0, w: READER_WIDTH, h: VIEWPORT_HEIGHT() })
+  const [settingsFrame, setSettingsFrame] = useState<ResizeFrame>(() => ({
+    x: Math.max(36, (window.innerWidth - 820) / 2),
+    y: 56,
+    w: Math.min(820, window.innerWidth - 72),
+    h: Math.min(700, window.innerHeight - 112)
+  }))
   const [persistState, setPersistState] = useState<'idle' | 'dirty' | 'saving' | 'error'>('idle')
   const activeRuns = useRef(new Map<string, AbortController>())
   const persistTimer = useRef<number | null>(null)
@@ -776,6 +839,17 @@ export function App() {
         setDocuments(snapshot.documents)
         setNodes(snapshot.sidebarNodes)
         setConfig({ ...snapshot.config, templates: applyPromptTemplateDefaults(snapshot.config.templates) })
+        setDirectoryFrame((frame) => ({
+          ...frame,
+          w: snapshot.config.layout.leftSidebarWidth || LEFT_DEFAULT,
+          h: VIEWPORT_HEIGHT()
+        }))
+        setReaderFrame((frame) => ({
+          ...frame,
+          x: snapshot.config.layout.leftSidebarWidth || LEFT_DEFAULT,
+          w: snapshot.config.layout.rightSidebarWidth || READER_WIDTH,
+          h: VIEWPORT_HEIGHT()
+        }))
         setCanvas({ ...snapshot.canvas, viewport: normalizeCanvasViewport(snapshot.canvas.viewport) })
         setRecords(snapshot.qaRecords)
         setLlmAccess(snapshot.llmAccess ?? null)
@@ -957,9 +1031,9 @@ export function App() {
   if (loading) return <div className="boot">Loading workspace...</div>
   if (error || !repo || !config || !canvas || !currentDocument) return <div className="boot">{error ?? 'Missing workspace state'}</div>
 
-  const leftWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : config.layout.leftSidebarWidth || LEFT_DEFAULT
+  const leftWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
   const readerLeft = leftWidth
-  const readerWidth = config.layout.rightSidebarCollapsed ? RAIL_WIDTH : readerMaximized ? `calc(100vw - ${readerLeft}px)` : READER_WIDTH
+  const readerWidth = config.layout.rightSidebarCollapsed ? RAIL_WIDTH : readerMaximized ? window.innerWidth - readerLeft : readerFrame.w
   const viewport = normalizeCanvasViewport(canvas.viewport)
   const visibleWidgets = canvas.widgetStates.filter((widget) => {
     if (widget.type === 'ask') return true
@@ -997,8 +1071,14 @@ export function App() {
                 const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
                 return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
               })}
-              onMove={(x, y) => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, position: { x, y } } : item) }))}
-              onResize={(w, h) => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, size: { w, h } } : item) }))}
+              onFrameChange={(frame) => updateCanvas((draft) => ({
+                ...draft,
+                widgetStates: draft.widgetStates.map((item) =>
+                  item.id === widget.id
+                    ? { ...item, position: { x: frame.x, y: frame.y }, size: { w: frame.w, h: frame.h } }
+                    : item
+                )
+              }))}
               onToggle={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, isCollapsed: !item.isCollapsed } : item) }))}
               onClose={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))}
               onDelete={() => void removeRecord(record, widget.id)}
@@ -1012,7 +1092,12 @@ export function App() {
         className="directory-window"
         collapsed={config.layout.leftSidebarCollapsed}
         title={<Logo />}
-        style={{ left: 0, top: 0, width: leftWidth, height: '100vh', zIndex: 20 }}
+        style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: directoryFrame.h, zIndex: 20 }}
+        onResize={(handle, dx, dy) => {
+          const frame = resizeFrame(handle, { x: 0, y: directoryFrame.y, w: leftWidth, h: directoryFrame.h }, dx, dy, RAIL_WIDTH, 160)
+          setDirectoryFrame({ ...frame, x: 0 })
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: frame.w } }))
+        }}
         actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
       >
         <div className="directory-body">
@@ -1049,7 +1134,13 @@ export function App() {
         className="reader-window"
         collapsed={config.layout.rightSidebarCollapsed}
         title={<span />}
-        style={{ left: readerLeft, top: 0, width: readerWidth, height: '100vh', zIndex: 18 }}
+        style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
+        onResize={(handle, dx, dy) => {
+          const frame = resizeFrame(handle, { x: readerLeft, y: readerFrame.y, w: Number(readerWidth), h: readerFrame.h }, dx, dy, RAIL_WIDTH, 160)
+          setReaderMaximized(false)
+          setReaderFrame({ ...frame, x: readerLeft })
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarWidth: frame.w } }))
+        }}
         actions={
           <>
             {!config.layout.rightSidebarCollapsed ? (
@@ -1103,9 +1194,11 @@ export function App() {
         <SettingsWindow
           config={config}
           binding={binding}
+          frame={settingsFrame}
           onClose={() => setModal(null)}
           onChange={updateConfig}
           onSave={() => void saveWorkspaceState({ config, canvas, version: workspaceVersion })}
+          onResize={(handle, dx, dy) => setSettingsFrame((frame) => resizeFrame(handle, frame, dx, dy, 360, 260))}
           onAddTemplate={() => updateConfig((draft) => ({
             ...draft,
             templates: [
