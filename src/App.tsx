@@ -1052,8 +1052,10 @@ export function App() {
         style={{ left: readerLeft, top: 0, width: readerWidth, height: '100vh', zIndex: 18 }}
         actions={
           <>
+            {!config.layout.rightSidebarCollapsed ? (
+              <IconButton icon="maximize" label="最大化" active={readerMaximized} onClick={() => setReaderMaximized((value) => !value)} />
+            ) : null}
             <IconButton icon={config.layout.rightSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="正文" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))} />
-            <IconButton icon="maximize" label="最大化" active={readerMaximized} onClick={() => setReaderMaximized((value) => !value)} />
           </>
         }
       >

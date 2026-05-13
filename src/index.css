@@ -198,6 +198,18 @@ svg path {
   height: 100vh;
 }
 
+.directory-window.is-collapsed .window-title,
+.reader-window.is-collapsed .window-title {
+  flex: 0 0 0;
+  padding: 0;
+}
+
+.directory-window.is-collapsed .window-actions,
+.reader-window.is-collapsed .window-actions {
+  width: 100%;
+  justify-content: center;
+}
+
 .directory-body {
   display: grid;
   grid-template-rows: minmax(0, 1fr) 35px;
