@@ -27,7 +27,7 @@
 .window-title {
   flex: 1;
   min-width: 0;
-  padding: 0 8px;
+  padding: 0 12px;
   overflow: hidden;
   color: #dddddd;
   font-size: 12px;
