@@ -34,7 +34,15 @@ import { QaWidget } from './components/QaWidget'
 import { SettingsWindow } from './components/SettingsWindow'
 import { Sidebar } from './components/Sidebar'
 import { resizeFrame, WindowFrame } from './components/WindowFrame'
-import { LEFT_DEFAULT, PERSIST_DELAY_MS, RAIL_WIDTH, READER_WIDTH, VIEWPORT_HEIGHT } from './constants'
+import {
+  DIRECTORY_AUTO_COLLAPSE_WIDTH,
+  LEFT_DEFAULT,
+  PERSIST_DELAY_MS,
+  RAIL_WIDTH,
+  READER_AUTO_COLLAPSE_WIDTH,
+  READER_WIDTH,
+  VIEWPORT_HEIGHT
+} from './constants'
 import { isAbortError } from './lib/errors'
 import { markdownBlocks, plainContextForDocument, selectionAction, titleForDocument } from './lib/markdown'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
@@ -436,8 +444,10 @@ export function App() {
         resizeHandles={['e']}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: 0, y: directoryFrame.y, w: leftWidth, h: directoryFrame.h }, dx, dy, RAIL_WIDTH, 160)
-          setDirectoryFrame({ ...frame, x: 0 })
-          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: frame.w } }))
+          const collapsed = frame.w < DIRECTORY_AUTO_COLLAPSE_WIDTH
+          const width = collapsed ? DIRECTORY_AUTO_COLLAPSE_WIDTH : frame.w
+          setDirectoryFrame({ ...frame, x: 0, w: width })
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: width, leftSidebarCollapsed: collapsed || draft.layout.leftSidebarCollapsed } }))
         }}
         actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
       >
@@ -480,9 +490,11 @@ export function App() {
         resizeHandles={['e']}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: readerLeft, y: readerFrame.y, w: Number(readerWidth), h: readerFrame.h }, dx, dy, RAIL_WIDTH, 160)
+          const collapsed = frame.w < READER_AUTO_COLLAPSE_WIDTH
+          const width = collapsed ? READER_AUTO_COLLAPSE_WIDTH : frame.w
           setReaderMaximized(false)
-          setReaderFrame({ ...frame, x: readerLeft })
-          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarWidth: frame.w } }))
+          setReaderFrame({ ...frame, x: readerLeft, w: width })
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarWidth: width, rightSidebarCollapsed: collapsed || draft.layout.rightSidebarCollapsed } }))
         }}
         actions={
           <>
