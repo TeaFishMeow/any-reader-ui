@@ -24,6 +24,7 @@ export function SettingsWindow({
   const templates = sortTemplates(config.templates)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null)
+  const [dragTarget, setDragTarget] = useState<{ id: string; after: boolean } | null>(null)
   const sections = [
     ['settings-shortcuts', '快捷键'],
     ['settings-repository', 'Repository'],
@@ -47,6 +48,7 @@ export function SettingsWindow({
     const sourceId = event.dataTransfer.getData('text/plain') || draggingTemplateId
     if (sourceId) moveTemplate(sourceId, targetId, event.clientY > rect.top + rect.height / 2)
     setDraggingTemplateId(null)
+    setDragTarget(null)
   }
   return (
     <WindowFrame
@@ -99,7 +101,7 @@ export function SettingsWindow({
           <div className="template-list">
             {templates.map((template) => (
               <div
-                className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}`}
+                className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}${dragTarget?.id === template.id ? (dragTarget.after ? ' is-drop-after' : ' is-drop-before') : ''}`}
                 key={template.id}
                 draggable
                 onDragStart={(event) => {
@@ -107,9 +109,15 @@ export function SettingsWindow({
                   event.dataTransfer.setData('text/plain', template.id)
                   setDraggingTemplateId(template.id)
                 }}
-                onDragEnd={() => setDraggingTemplateId(null)}
+                onDragEnd={() => {
+                  setDraggingTemplateId(null)
+                  setDragTarget(null)
+                }}
                 onDragOver={(event) => {
-                  if (draggingTemplateId) event.preventDefault()
+                  if (!draggingTemplateId || draggingTemplateId === template.id) return
+                  event.preventDefault()
+                  const rect = event.currentTarget.getBoundingClientRect()
+                  setDragTarget({ id: template.id, after: event.clientY > rect.top + rect.height / 2 })
                 }}
                 onDrop={(event) => dropTemplate(event, template.id)}
               >

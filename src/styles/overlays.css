@@ -228,6 +228,14 @@
   opacity: 0.55;
 }
 
+.template-row.is-drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.template-row.is-drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .template-row:active {
   cursor: grabbing;
 }
