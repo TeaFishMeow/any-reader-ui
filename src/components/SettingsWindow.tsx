@@ -1,4 +1,4 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, RepositoryBinding } from '../../src_original_reference/types/domain'
@@ -42,20 +42,18 @@ export function SettingsWindow({
       return { ...draft, templates: templates.map((item, order) => ({ ...item, order })) }
     })
   }
-  const dropTemplate = (event: DragEvent<HTMLDivElement>, targetId: string) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const sourceId = event.dataTransfer.getData('text/plain') || draggingTemplateId
-    if (sourceId) moveTemplate(sourceId, targetId, event.clientY > rect.top + rect.height / 2)
-    setDraggingTemplateId(null)
-    setDragTarget(null)
-  }
-  const dropTargetFromContent = (container: HTMLDivElement, y: number) => {
-    const rows = [...container.querySelectorAll<HTMLElement>('[data-template-id]')]
-    if (!rows.length) return null
-    const row = rows.find((item) => y < item.getBoundingClientRect().top + item.getBoundingClientRect().height / 2) ?? rows[rows.length - 1]
-    return { id: row.dataset.templateId ?? '', after: row === rows[rows.length - 1] && y >= row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 }
+  const templateDropTarget = (container: HTMLDivElement, y: number, sourceId: string) => {
+    return [...container.querySelectorAll<HTMLElement>('[data-template-id]')].reduce<{ id: string; after: boolean; distance: number } | null>((best, row) => {
+      const id = row.dataset.templateId
+      if (!id || id === sourceId) return best
+      const rect = row.getBoundingClientRect()
+      const edges = [
+        { id, after: false, distance: Math.abs(y - rect.top) },
+        { id, after: true, distance: Math.abs(y - rect.bottom) }
+      ]
+      const nearest = edges[0].distance < edges[1].distance ? edges[0] : edges[1]
+      return !best || nearest.distance < best.distance ? nearest : best
+    }, null)
   }
   return (
     <WindowFrame
@@ -83,14 +81,14 @@ export function SettingsWindow({
           ref={contentRef}
           onDragOver={(event) => {
             if (!draggingTemplateId) return
-            const target = dropTargetFromContent(event.currentTarget, event.clientY)
+            const target = templateDropTarget(event.currentTarget, event.clientY, draggingTemplateId)
             if (!target) return
             event.preventDefault()
             setDragTarget(target)
           }}
           onDrop={(event) => {
             if (!draggingTemplateId) return
-            const target = dropTargetFromContent(event.currentTarget, event.clientY)
+            const target = templateDropTarget(event.currentTarget, event.clientY, draggingTemplateId)
             if (!target) return
             event.preventDefault()
             moveTemplate(draggingTemplateId, target.id, target.after)
@@ -140,18 +138,6 @@ export function SettingsWindow({
                   setDraggingTemplateId(null)
                   setDragTarget(null)
                 }}
-                onDragOver={(event) => {
-                  event.stopPropagation()
-                  if (!draggingTemplateId) return
-                  if (draggingTemplateId === template.id) {
-                    setDragTarget(null)
-                    return
-                  }
-                  event.preventDefault()
-                  const rect = event.currentTarget.getBoundingClientRect()
-                  setDragTarget({ id: template.id, after: event.clientY > rect.top + rect.height / 2 })
-                }}
-                onDrop={(event) => dropTemplate(event, template.id)}
               >
                 <span className="template-drag" aria-hidden="true">
                   <Icon name="drag" />
