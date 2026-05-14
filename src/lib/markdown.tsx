@@ -15,7 +15,13 @@ export function titleForDocument(document: DocumentNode) {
 }
 
 export function markdownBlocks(markdown: string, documentPath?: string) {
-  return <MarkdownHtml markdown={markdown} documentPath={documentPath} />
+  return <MarkdownHtml markdown={withFallbackTitle(markdown, documentPath)} documentPath={documentPath} />
+}
+
+function withFallbackTitle(markdown: string, documentPath?: string) {
+  if (/^#\s+\S/m.test(markdown)) return markdown
+  const filename = documentPath?.split('/').pop()?.replace(/\.md$/i, '').trim()
+  return filename ? `# ${filename}\n\n${markdown}` : markdown
 }
 
 const MarkdownHtml = memo(function MarkdownHtml({
