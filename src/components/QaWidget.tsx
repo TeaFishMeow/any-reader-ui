@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { MAIN_CANVAS_ID } from '../../src_original_reference/lib/defaults'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
@@ -33,9 +33,10 @@ export function QaWidget({
   onAsk: (action: AskAction) => void
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const ref = useRef<HTMLDivElement | null>(null)
   const drag = (event: React.PointerEvent) => {
-    if ((event.target as HTMLElement).closest('button,input,textarea,.window-body')) return
+    if ((event.target as HTMLElement).closest('button,input,textarea')) return
+    event.preventDefault()
+    event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     const sx = event.clientX
     const sy = event.clientY
@@ -51,9 +52,11 @@ export function QaWidget({
     const done = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', done)
+      window.removeEventListener('pointercancel', done)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', done)
+    window.addEventListener('pointercancel', done)
   }
   const sourceDocument = record?.sourceDocumentId ? documents.find((document) => document.id === record.sourceDocumentId) : null
   const answerText = displayAnswerMarkdown(record?.answerMarkdown || (record?.answerStatus === 'pending' ? '等待回答...' : ''))
@@ -82,6 +85,7 @@ export function QaWidget({
           h: widget.size.h
         }, dx, dy))
       }
+      onTitlePointerDown={drag}
       actions={
         <>
           <IconButton icon={widget.isCollapsed ? 'chevronDown' : 'chevronUp'} label="收起" active={widget.isCollapsed} onClick={onToggle} />
@@ -91,7 +95,7 @@ export function QaWidget({
       }
       onMouseDown={onFocus}
     >
-      <div ref={ref} className="qa-inner" onPointerDown={drag}>
+      <div className="qa-inner">
         <DetailWindow
           open={detailsOpen}
           selectedText={record?.selectedText ?? ''}

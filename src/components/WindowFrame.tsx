@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { ResizeFrame, ResizeHandle } from '../types'
 
 export function resizeFrame(handle: ResizeHandle, frame: ResizeFrame, dx: number, dy: number, minW = 260, minH = 220) {
@@ -60,6 +60,7 @@ export function WindowFrame({
   collapsed,
   style,
   onMouseDown,
+  onTitlePointerDown,
   onResize,
   resizeHandles,
   children
@@ -70,13 +71,14 @@ export function WindowFrame({
   collapsed?: boolean
   style?: CSSProperties
   onMouseDown?: () => void
+  onTitlePointerDown?: (event: ReactPointerEvent<HTMLElement>) => void
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
   resizeHandles?: ResizeHandle[]
   children: ReactNode
 }) {
   return (
     <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}`} style={style} onMouseDown={onMouseDown}>
-      <header className="window-titlebar" data-window-drag="true">
+      <header className="window-titlebar" data-window-drag="true" onPointerDown={onTitlePointerDown}>
         <div className="window-title">{title}</div>
         <div className="window-actions">{actions}</div>
       </header>

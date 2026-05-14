@@ -350,22 +350,29 @@ export function App() {
   })
 
   return (
-    <main className="app-canvas">
-      <div className="canvas-grid" />
+    <main
+      className="app-canvas"
+      onPointerDown={(event) => {
+        if ((event.target as HTMLElement).closest('.window-frame,button,input,textarea')) return
+        const start = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }
+        const move = (moveEvent: PointerEvent) => updateCanvas((draft) => ({
+          ...draft,
+          viewport: { ...draft.viewport, x: start.vx + moveEvent.clientX - start.x, y: start.vy + moveEvent.clientY - start.y }
+        }))
+        const done = () => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', done)
+          window.removeEventListener('pointercancel', done)
+        }
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', done)
+        window.addEventListener('pointercancel', done)
+      }}
+    >
+      <div className="canvas-grid" style={{ backgroundPosition: `${viewport.x}px ${viewport.y}px` }} />
       <div
         className="canvas-scene"
         style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
-        onPointerDown={(event) => {
-          if ((event.target as HTMLElement).closest('.window-frame')) return
-          const start = { x: event.clientX, y: event.clientY, vx: viewport.x, vy: viewport.y }
-          const move = (moveEvent: PointerEvent) => updateCanvas((draft) => ({ ...draft, viewport: { ...draft.viewport, x: start.vx + moveEvent.clientX - start.x, y: start.vy + moveEvent.clientY - start.y } }))
-          const done = () => {
-            window.removeEventListener('pointermove', move)
-            window.removeEventListener('pointerup', done)
-          }
-          window.addEventListener('pointermove', move)
-          window.addEventListener('pointerup', done)
-        }}
       >
         {visibleWidgets.map((widget) => {
           const record = widget.type === 'qa-record' ? activeRecords.find((item) => item.id === widget.props.qaRecordId) ?? null : null
