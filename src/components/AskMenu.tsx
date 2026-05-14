@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { clamp } from '../../src_original_reference/lib/text'
 import type { PromptTemplate } from '../../src_original_reference/types/domain'
 import type { AskMenuState } from '../types'
+import { selectionMenuPosition } from '../lib/menuPosition'
 
 export function AskMenu({
   state,
@@ -29,10 +29,7 @@ export function AskMenu({
     <div
       ref={ref}
       className="ask-menu"
-      style={{
-        left: clamp(state.session.action.menuPoint.x, 12, window.innerWidth - 340),
-        top: clamp(state.session.action.menuPoint.y, 12, window.innerHeight - 260)
-      }}
+      style={selectionMenuPosition(state.session.action.menuPoint)}
     >
       {templates.map((template) => (
         <button

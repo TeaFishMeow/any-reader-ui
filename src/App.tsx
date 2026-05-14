@@ -362,6 +362,11 @@ export function App() {
   const readerLeft = leftWidth
   const readerWidth = config.layout.rightSidebarCollapsed ? RAIL_WIDTH : readerMaximized ? window.innerWidth - readerLeft : readerFrame.w
   const readerTitle = currentDocument.path.split('/').slice(0, -1).join('/')
+  const tier = llmAccess?.subscription?.effectiveTier ?? 'free'
+  const dailyQuota = llmAccess?.dailyQuota ?? 0
+  const dailyUsed = llmAccess?.dailyUsed ?? Math.max(0, dailyQuota - (llmAccess?.dailyRemaining ?? dailyQuota))
+  const permanentBalance = llmAccess?.permanentBalance ?? llmAccess?.creditBalance ?? 0
+  const creditSummary = `${tier === 'free' ? 'Free' : tier.toUpperCase()} ${dailyUsed}/${dailyQuota} (+${permanentBalance})`
   const viewport = normalizeCanvasViewport(canvas.viewport)
   const visibleWidgets = canvas.widgetStates.filter((widget) => {
     if (widget.type === 'ask') return true
@@ -458,8 +463,8 @@ export function App() {
                 setFloatingMenu({ kind: 'model', x: rect.left, y: rect.top })
               }}
             >
-              <Icon name="spark" />
-              <span>{llmAccess?.dailyRemaining ?? llmAccess?.creditBalance ?? config.provider.model}</span>
+              <span aria-hidden="true">✦</span>
+              <span>{creditSummary}</span>
             </button>
             <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
           </footer>

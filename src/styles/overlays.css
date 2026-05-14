@@ -18,7 +18,7 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  padding: 7px 9px;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -26,10 +26,10 @@
 }
 
 .floating-menu button {
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  height: 30px;
+  gap: 6px;
+  height: 24px;
 }
 
 .ask-menu button:hover,
@@ -48,6 +48,49 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.floating-menu {
+  width: 190px;
+  padding: 3px 0;
+}
+
+.floating-menu-heading,
+.floating-menu-empty,
+.floating-menu-subscription {
+  display: block;
+  padding: 5px 8px;
+}
+
+.floating-menu-heading {
+  border-bottom: 1px solid var(--line);
+  color: #eeeeee;
+  font-weight: 600;
+}
+
+.floating-menu button.is-active {
+  background: var(--accent-soft);
+}
+
+.floating-menu button small {
+  color: var(--muted);
+}
+
+.floating-menu-empty {
+  color: var(--muted);
+}
+
+.floating-menu-subscription {
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.floating-menu-subscription:hover,
+.floating-menu-subscription:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
 }
 
 .ask-menu span {

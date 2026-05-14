@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { AppConfig, LlmAccessState } from '../../src_original_reference/types/domain'
+import { selectionMenuPosition } from '../lib/menuPosition'
 import type { MenuState } from '../types'
-import { Icon } from './Icon'
-
 export function FloatingMenu({
   state,
   config,
@@ -27,24 +26,32 @@ export function FloatingMenu({
     return () => window.removeEventListener('mousedown', close)
   }, [onClose])
 
-  const models = llmAccess?.models ?? []
+  const models = llmAccess?.models.length ? llmAccess.models : [
+    { id: 'gpt-4.1-mini', displayName: 'gpt-4.1-mini', model: 'gpt-4.1-mini', cost: 1, isDefault: true },
+    { id: 'gpt-4.1', displayName: 'gpt-4.1', model: 'gpt-4.1', cost: 3, isDefault: false },
+    { id: 'o4-mini', displayName: 'o4-mini', model: 'o4-mini', cost: 2, isDefault: false },
+    { id: 'o3', displayName: 'o3', model: 'o3', cost: 6, isDefault: false }
+  ]
   return (
-    <div ref={ref} className="floating-menu" style={{ left: state.x, top: state.y }}>
+    <div ref={ref} className="floating-menu" style={selectionMenuPosition(state)}>
       {state.kind === 'model' ? (
-        models.length ? models.map((model) => (
-          <button key={model.id} type="button" onClick={() => { onSelectModel(model.id); onClose() }}>
-            <Icon name="spark" />
-            <span>{model.displayName || model.model}</span>
-          </button>
-        )) : (
-          <button type="button">
-            <Icon name="spark" />
-            <span>{config.provider.model}</span>
-          </button>
-        )
+        <>
+          <span className="floating-menu-heading">模型选择</span>
+          {models.map((model) => (
+            <button
+              key={model.id}
+              className={model.id === config.provider.model ? 'is-active' : ''}
+              type="button"
+              onClick={() => { onSelectModel(model.id); onClose() }}
+            >
+              <span>{model.displayName || model.model}</span>
+              <small>{model.cost}</small>
+            </button>
+          ))}
+          <a className="floating-menu-subscription" href="/subscription">管理订阅</a>
+        </>
       ) : (
         <button type="button" onClick={() => { onOpenSettings(); onClose() }}>
-          <Icon name="settings" />
           <span>Settings</span>
         </button>
       )}

@@ -26,7 +26,6 @@ export function SettingsWindow({
   const templates = sortTemplates(config.templates)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const sections = [
-    ['settings-provider', 'Provider'],
     ['settings-shortcuts', '快捷键'],
     ['settings-repository', 'Repository'],
     ['settings-templates', '提问选项']
@@ -53,25 +52,6 @@ export function SettingsWindow({
           ))}
         </aside>
         <div className="settings-content" ref={contentRef}>
-        <section id="settings-provider">
-          <h2>Provider</h2>
-          <label>
-            <span>Base URL</span>
-            <input value={config.provider.baseUrl} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, baseUrl: event.target.value } }))} />
-          </label>
-          <label>
-            <span>API Key</span>
-            <input value={config.provider.apiKey} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, apiKey: event.target.value } }))} />
-          </label>
-          <label>
-            <span>Model</span>
-            <input value={config.provider.model} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, model: event.target.value } }))} />
-          </label>
-          <label>
-            <span>Temperature</span>
-            <input type="number" min="0" max="2" step="0.1" value={config.provider.temperature} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, temperature: Number(event.target.value) } }))} />
-          </label>
-        </section>
         <section id="settings-shortcuts">
           <h2>快捷键</h2>
           {([
