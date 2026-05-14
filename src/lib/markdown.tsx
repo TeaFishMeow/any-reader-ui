@@ -197,45 +197,23 @@ export function selectionAction(args: {
 function selectedTextWithKatexSource(selection: Selection) {
   if (selection.rangeCount === 0) return ''
   const range = selection.getRangeAt(0)
-  const root = range.commonAncestorContainer
-  const parts: string[] = []
-  const usedMath = new Set<Element>()
   const mathSelector = `[${katexSourceAttribute}]`
+  const commonElement =
+    range.commonAncestorContainer instanceof Element
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement
+  const enclosingMath = commonElement?.closest(mathSelector)
 
-  const pushMath = (element: Element) => {
-    if (usedMath.has(element)) return
-    usedMath.add(element)
-    const latex = element.getAttribute(katexSourceAttribute)?.trim()
-    if (!latex) return
-    parts.push(element.getAttribute(katexDisplayAttribute) === 'true' ? `$$${latex}$$` : `$${latex}$`)
-  }
+  if (enclosingMath) return katexSourceText(enclosingMath)
 
-  const collect = (node: Node) => {
-    if (!range.intersectsNode(node)) return
-    if (node.nodeType === Node.TEXT_NODE) {
-      const mathElement = node.parentElement?.closest(mathSelector)
-      if (mathElement) {
-        pushMath(mathElement)
-        return
-      }
-      const value = node.textContent ?? ''
-      const start = node === range.startContainer ? range.startOffset : 0
-      const end = node === range.endContainer ? range.endOffset : value.length
-      parts.push(value.slice(start, end))
-      return
-    }
+  const fragment = range.cloneContents()
+  fragment.querySelectorAll(mathSelector).forEach((element) => {
+    element.textContent = katexSourceText(element)
+  })
+  return fragment.textContent?.trim() || selection.toString().trim()
+}
 
-    if (node instanceof Element) {
-      const mathElement = node.matches(mathSelector) ? node : node.closest(mathSelector)
-      if (mathElement) {
-        pushMath(mathElement)
-        return
-      }
-    }
-
-    node.childNodes.forEach(collect)
-  }
-
-  collect(root)
-  return parts.join('').trim() || selection.toString().trim()
+function katexSourceText(element: Element) {
+  const latex = element.getAttribute(katexSourceAttribute)?.trim() ?? ''
+  return element.getAttribute(katexDisplayAttribute) === 'true' ? `$$${latex}$$` : `$${latex}$`
 }
