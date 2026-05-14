@@ -10,12 +10,22 @@ import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AskAction, DocumentNode } from '../../src_original_reference/types/domain'
 import { katexDelimiters, katexDisplayAttribute, katexOptions, katexSourceAttribute } from './katexConfig'
 
+export interface MarkdownHighlight {
+  id: string
+  text: string
+  color: string
+  startOffset?: number
+  endOffset?: number
+  contextPrefix?: string
+  contextSuffix?: string
+}
+
 export function titleForDocument(document: DocumentNode) {
   return document.title.trim() || document.path.split('/').pop()?.replace(/\.md$/i, '') || document.path
 }
 
-export function markdownBlocks(markdown: string, documentPath?: string) {
-  return <MarkdownHtml markdown={withFallbackTitle(markdown, documentPath)} documentPath={documentPath} />
+export function markdownBlocks(markdown: string, documentPath?: string, highlights: MarkdownHighlight[] = []) {
+  return <MarkdownHtml markdown={markdown} documentPath={documentPath} highlights={highlights} />
 }
 
 function withFallbackTitle(markdown: string, documentPath?: string) {
@@ -26,16 +36,20 @@ function withFallbackTitle(markdown: string, documentPath?: string) {
 
 const MarkdownHtml = memo(function MarkdownHtml({
   markdown,
-  documentPath
+  documentPath,
+  highlights
 }: {
   markdown: string
   documentPath?: string
+  highlights: MarkdownHighlight[]
 }) {
-  const html = useMemo(() => renderMarkdownHtml(markdown, documentPath), [markdown, documentPath])
+  const html = useMemo(() => renderMarkdownHtml(markdown, documentPath, highlights), [markdown, documentPath, highlights])
   return <div dangerouslySetInnerHTML={{ __html: html }} />
 })
 
-function renderMarkdownHtml(markdown: string, documentPath?: string) {
+function renderMarkdownHtml(markdown: string, documentPath?: string, highlights: MarkdownHighlight[] = []) {
+  const marked = markMarkdownSource(markdown, highlights)
+  const displayMarkdown = withFallbackTitle(marked.markdown, documentPath)
   const mathSlots: string[] = []
   const html = String(
     unified()
@@ -55,15 +69,22 @@ function renderMarkdownHtml(markdown: string, documentPath?: string) {
         }
       })
       .use(rehypeStringify)
-      .processSync(markdown)
+      .processSync(displayMarkdown)
   )
 
-  return mathSlots.reduce(
+  const resolvedHtml = mathSlots.reduce(
     (nextHtml, slot, index) =>
       nextHtml.replaceAll(`<anyreader-katex data-index="${index}"></anyreader-katex>`, slot),
     html
   ).replace(/(<img\b[^>]*\bsrc=")([^"]*)(")/g, (_match, prefix: string, src: string, suffix: string) =>
     `${prefix}${escapeHtmlAttribute(resolveAssetPath(documentPath, src))}${suffix}`
+  )
+  return marked.markers.reduce(
+    (nextHtml, marker) =>
+      nextHtml
+        .replaceAll(marker.startToken, `<mark class="qa-source-highlight" data-qa-record-id="${escapeHtmlAttribute(marker.id)}" style="--qa-highlight-color: ${safeCssColor(marker.color)}">`)
+        .replaceAll(marker.endToken, '</mark>'),
+    resolvedHtml
   )
 }
 
@@ -181,6 +202,197 @@ function escapeHtml(input: string) {
 
 function escapeHtmlAttribute(input: string) {
   return escapeHtml(input).replace(/"/g, '&quot;')
+}
+
+type MappedChar = { ch: string; source: number }
+type SourceRange = { id: string; color: string; start: number; end: number }
+
+function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
+  if (!highlights.length) return { markdown, markers: [] as Array<SourceRange & { startToken: string; endToken: string }> }
+  const map = plainMapForMarkdown(markdown)
+  const formulas = mathSourceRanges(markdown)
+  const ranges = highlights
+    .flatMap((highlight) => sourceRangesForHighlight(markdown, map, formulas, highlight))
+    .sort((left, right) => left.start - right.start)
+    .filter((range, index, ranges) => index === 0 || range.start >= ranges[index - 1].end)
+
+  const markers = ranges.map((range, index) => ({
+    ...range,
+    startToken: `§ARHL${index}S§`,
+    endToken: `§ARHL${index}E§`
+  }))
+  const nextMarkdown = markers
+    .slice()
+    .reverse()
+    .reduce((text, marker) => `${text.slice(0, marker.start)}${marker.startToken}${text.slice(marker.start, marker.end)}${marker.endToken}${text.slice(marker.end)}`, markdown)
+
+  return { markdown: nextMarkdown, markers }
+}
+
+function sourceRangesForHighlight(markdown: string, map: { text: string; chars: MappedChar[] }, formulas: Array<{ start: number; end: number }>, highlight: MarkdownHighlight) {
+  const fromPlain = plainRangeForHighlight(map.text, highlight)
+  const ranges = fromPlain ? sourceRangesFromPlain(map.chars, fromPlain.start, fromPlain.end, highlight) : []
+  if (!ranges.length) {
+    const direct = directSourceRange(markdown, highlight)
+    if (direct) ranges.push(direct)
+  }
+  return mergeSourceRanges(ranges.map((range) => expandFormulaRange(range, formulas)))
+}
+
+function sourceRangesFromPlain(chars: MappedChar[], start: number, end: number, highlight: MarkdownHighlight) {
+  const ranges: SourceRange[] = []
+  chars
+    .slice(start, end)
+    .map((item) => item.source)
+    .filter((source) => source >= 0)
+    .sort((left, right) => left - right)
+    .forEach((source) => {
+      const last = ranges[ranges.length - 1]
+      if (last && source === last.end) last.end = source + 1
+      else ranges.push({ id: highlight.id, color: highlight.color, start: source, end: source + 1 })
+    })
+  return ranges
+}
+
+function plainRangeForHighlight(plainText: string, highlight: MarkdownHighlight) {
+  const candidates = textCandidates(highlight.text)
+  if (!candidates.length) return null
+  if (
+    typeof highlight.startOffset === 'number' &&
+    typeof highlight.endOffset === 'number' &&
+    candidates.includes(plainText.slice(highlight.startOffset, highlight.endOffset).trim())
+  ) {
+    return { start: highlight.startOffset, end: highlight.endOffset }
+  }
+
+  const match = findPlainMatch(plainText, candidates, highlight)
+  return match.start >= 0 ? { start: match.start, end: match.start + match.text.length } : null
+}
+
+function findPlainMatch(plainText: string, candidates: string[], highlight: MarkdownHighlight) {
+  const prefixes = textCandidates(highlight.contextPrefix ?? '').map((text) => text.slice(-80))
+  for (const prefix of prefixes) {
+    const prefixIndex = plainText.indexOf(prefix)
+    const match = prefixIndex >= 0 ? firstCandidateIndex(plainText, candidates, prefixIndex + prefix.length) : null
+    if (match) return match
+  }
+
+  const suffixes = textCandidates(highlight.contextSuffix ?? '').map((text) => text.slice(0, 80))
+  for (const suffix of suffixes) {
+    const suffixIndex = plainText.indexOf(suffix)
+    const match = suffixIndex >= 0 ? lastCandidateIndex(plainText, candidates, suffixIndex) : null
+    if (match) return match
+  }
+
+  return firstCandidateIndex(plainText, candidates, 0) ?? { start: -1, text: '' }
+}
+
+function directSourceRange(markdown: string, highlight: MarkdownHighlight): SourceRange | null {
+  for (const text of textCandidates(highlight.text)) {
+    const start = markdown.indexOf(text)
+    if (start >= 0) return { id: highlight.id, color: highlight.color, start, end: start + text.length }
+  }
+  return null
+}
+
+function textCandidates(input: string) {
+  return [...new Set([input.trim(), markdownToPlainText(input).trim()].filter(Boolean))]
+}
+
+function firstCandidateIndex(text: string, candidates: string[], from: number) {
+  return candidates.reduce<{ start: number; text: string } | null>((best, candidate) => {
+    const start = text.indexOf(candidate, from)
+    return start >= 0 && (!best || start < best.start) ? { start, text: candidate } : best
+  }, null)
+}
+
+function lastCandidateIndex(text: string, candidates: string[], before: number) {
+  return candidates.reduce<{ start: number; text: string } | null>((best, candidate) => {
+    const start = text.lastIndexOf(candidate, before)
+    return start >= 0 && (!best || start > best.start) ? { start, text: candidate } : best
+  }, null)
+}
+
+function mergeSourceRanges(ranges: SourceRange[]) {
+  return ranges
+    .sort((left, right) => left.start - right.start)
+    .reduce<SourceRange[]>((merged, range) => {
+      const last = merged[merged.length - 1]
+      if (last && last.id === range.id && last.color === range.color && range.start <= last.end) last.end = Math.max(last.end, range.end)
+      else merged.push({ ...range })
+      return merged
+    }, [])
+}
+
+function expandFormulaRange(range: SourceRange, formulas: Array<{ start: number; end: number }>) {
+  return formulas.reduce<SourceRange>((next, formula) => (
+    next.start < formula.end && next.end > formula.start
+      ? { ...next, start: Math.min(next.start, formula.start), end: Math.max(next.end, formula.end) }
+      : next
+  ), range)
+}
+
+function mathSourceRanges(markdown: string) {
+  const ranges: Array<{ start: number; end: number }> = []
+  for (const delimiter of katexDelimiters) {
+    let start = markdown.indexOf(delimiter.left)
+    while (start >= 0) {
+      if (isEscaped(markdown, start) || isDoubleDollar(markdown, start, delimiter.left)) {
+        start = markdown.indexOf(delimiter.left, start + delimiter.left.length)
+        continue
+      }
+      const contentStart = start + delimiter.left.length
+      const end = findClosingDelimiter(markdown, contentStart, delimiter.right)
+      if (end < 0) break
+      ranges.push({ start, end: end + delimiter.right.length })
+      start = markdown.indexOf(delimiter.left, end + delimiter.right.length)
+    }
+  }
+  return ranges.sort((left, right) => left.start - right.start)
+}
+
+function plainMapForMarkdown(markdown: string) {
+  let chars = [...markdown].map((ch, source) => ({ ch, source }))
+  chars = replaceMapped(chars, /```[\s\S]*?```/g, (match) => [{ ch: ' ', source: match.index }])
+  chars = replaceMapped(chars, /`([^`]+)`/g, (match) => groupChars(chars, match, 1))
+  chars = replaceMapped(chars, /!\[[^\]]*]\([^)]*\)/g, (match) => [{ ch: ' ', source: match.index }])
+  chars = replaceMapped(chars, /\[([^\]]+)]\([^)]*\)/g, (match) => groupChars(chars, match, 1))
+  chars = replaceMapped(chars, /^>\s?/gm, () => [])
+  chars = replaceMapped(chars, /^#{1,6}\s+/gm, () => [])
+  chars = replaceMapped(chars, /[*_~]/g, () => [])
+  chars = replaceMapped(chars, /^\s*[-+]\s+/gm, () => [])
+  chars = replaceMapped(chars, /^\s*\d+\.\s+/gm, () => [])
+  chars = replaceMapped(chars, /\n{3,}/g, (match) => [
+    { ch: '\n', source: match.index },
+    { ch: '\n', source: match.index + 1 }
+  ])
+  while (chars[0]?.ch.match(/\s/)) chars.shift()
+  while (chars[chars.length - 1]?.ch.match(/\s/)) chars.pop()
+  return { text: chars.map((item) => item.ch).join(''), chars }
+}
+
+function replaceMapped(chars: MappedChar[], regex: RegExp, replacement: (match: RegExpExecArray) => MappedChar[]) {
+  const text = chars.map((item) => item.ch).join('')
+  const next: MappedChar[] = []
+  let cursor = 0
+  for (const match of text.matchAll(regex)) {
+    next.push(...chars.slice(cursor, match.index))
+    next.push(...replacement(match))
+    cursor = (match.index ?? 0) + match[0].length
+  }
+  next.push(...chars.slice(cursor))
+  return next
+}
+
+function groupChars(chars: MappedChar[], match: RegExpExecArray, groupIndex: number) {
+  const value = match[groupIndex] ?? ''
+  const offset = match[0].indexOf(value)
+  const start = (match.index ?? 0) + offset
+  return chars.slice(start, start + value.length)
+}
+
+function safeCssColor(color: string) {
+  return /^#[\da-f]{3,8}$/i.test(color) ? color : '#569cd6'
 }
 
 export function plainContextForDocument(document: DocumentNode) {

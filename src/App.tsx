@@ -44,7 +44,7 @@ import {
   VIEWPORT_HEIGHT
 } from './constants'
 import { isAbortError } from './lib/errors'
-import { markdownBlocks, plainContextForDocument, selectionAction, titleForDocument } from './lib/markdown'
+import { markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
 
 export function App() {
@@ -79,6 +79,20 @@ export function App() {
   const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] ?? null : null
   const activeRecords = useMemo(() => records.filter((record) => !record.lifecycle.isDeleted), [records])
   const templates = useMemo(() => sortTemplates(config?.templates ?? []).filter((template) => template.isEnabled), [config])
+  const readerHighlights = useMemo<MarkdownHighlight[]>(() => {
+    if (!currentDocument) return []
+    return activeRecords
+      .filter((record) => record.sourceSurface === 'reader' && record.sourceDocumentId === currentDocument.id && record.selectedText && record.visualStyle.markerType !== 'none')
+      .map((record) => ({
+        id: record.id,
+        text: record.selectedText,
+        color: record.visualStyle.color,
+        startOffset: record.anchor.startOffset,
+        endOffset: record.anchor.endOffset,
+        contextPrefix: record.anchor.contextPrefix,
+        contextSuffix: record.anchor.contextSuffix
+      }))
+  }, [activeRecords, currentDocument])
 
   const schedulePersist = useCallback((nextConfig: AppConfig | null, nextCanvas: CanvasState | null) => {
     if (!nextConfig || !nextCanvas) return
@@ -530,7 +544,7 @@ export function App() {
             if (action) openAsk(action)
           }}
         >
-          {markdownBlocks(currentDocument.contentMd, currentDocument.path)}
+          {markdownBlocks(currentDocument.contentMd, currentDocument.path, readerHighlights)}
         </article>
       </WindowFrame>
 

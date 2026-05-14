@@ -99,6 +99,12 @@
   margin-inline: auto;
 }
 
+.qa-source-highlight {
+  background: color-mix(in srgb, var(--qa-highlight-color) 28%, transparent);
+  border-bottom: 2px solid var(--qa-highlight-color);
+  color: inherit;
+}
+
 .math-block {
   overflow-x: auto;
   overflow-y: hidden;
