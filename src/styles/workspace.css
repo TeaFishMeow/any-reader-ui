@@ -105,6 +105,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-size: smaller;
 }
 
 .directory-footer button:hover,
