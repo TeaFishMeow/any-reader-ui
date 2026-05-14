@@ -189,7 +189,8 @@
 }
 
 .template-row {
-  grid-template-columns: 28px 150px minmax(0, 1fr) 28px;
+  grid-template-columns: 24px 28px 150px minmax(0, 1fr) 28px;
+  cursor: grab;
 }
 
 .settings-body label span {
@@ -221,6 +222,27 @@
 .template-row > input[type='checkbox'] {
   width: 16px;
   justify-self: center;
+}
+
+.template-row.is-dragging {
+  opacity: 0.55;
+}
+
+.template-row:active {
+  cursor: grabbing;
+}
+
+.template-row input,
+.template-row button {
+  cursor: auto;
+}
+
+.template-drag {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 26px;
+  color: var(--muted);
 }
 
 .template-delete,

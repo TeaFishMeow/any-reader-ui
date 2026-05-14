@@ -32,6 +32,8 @@ function iconPath(name: IconName) {
       return 'M8 3.5v9M3.5 8h9'
     case 'minus':
       return 'M3.5 8h9'
+    case 'drag':
+      return 'M5.5 4.5h.01M10.5 4.5h.01M5.5 8h.01M10.5 8h.01M5.5 11.5h.01M10.5 11.5h.01'
   }
 }
 

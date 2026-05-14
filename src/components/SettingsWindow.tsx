@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState, type DragEvent } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, RepositoryBinding } from '../../src_original_reference/types/domain'
@@ -25,11 +25,31 @@ export function SettingsWindow({
 }) {
   const templates = sortTemplates(config.templates)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null)
   const sections = [
     ['settings-shortcuts', '快捷键'],
     ['settings-repository', 'Repository'],
     ['settings-templates', '提问选项']
   ] as const
+  const moveTemplate = (sourceId: string, targetId: string, after: boolean) => {
+    if (sourceId === targetId) return
+    onChange((draft) => {
+      const source = draft.templates.find((item) => item.id === sourceId)
+      if (!source) return draft
+      const rest = sortTemplates(draft.templates).filter((item) => item.id !== sourceId)
+      const targetIndex = rest.findIndex((item) => item.id === targetId)
+      const insertIndex = targetIndex < 0 ? rest.length : targetIndex + (after ? 1 : 0)
+      const templates = [...rest.slice(0, insertIndex), source, ...rest.slice(insertIndex)]
+      return { ...draft, templates: templates.map((item, order) => ({ ...item, order })) }
+    })
+  }
+  const dropTemplate = (event: DragEvent<HTMLDivElement>, targetId: string) => {
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    const sourceId = event.dataTransfer.getData('text/plain') || draggingTemplateId
+    if (sourceId) moveTemplate(sourceId, targetId, event.clientY > rect.top + rect.height / 2)
+    setDraggingTemplateId(null)
+  }
   return (
     <WindowFrame
       className="settings-window"
@@ -80,7 +100,24 @@ export function SettingsWindow({
           <h2>提问选项</h2>
           <div className="template-list">
             {templates.map((template) => (
-              <div className="template-row" key={template.id}>
+              <div
+                className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}`}
+                key={template.id}
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', template.id)
+                  setDraggingTemplateId(template.id)
+                }}
+                onDragEnd={() => setDraggingTemplateId(null)}
+                onDragOver={(event) => {
+                  if (draggingTemplateId) event.preventDefault()
+                }}
+                onDrop={(event) => dropTemplate(event, template.id)}
+              >
+                <span className="template-drag" aria-hidden="true">
+                  <Icon name="drag" />
+                </span>
                 <input type="checkbox" checked={template.isEnabled} aria-label="启用" onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
                 <input value={template.title} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
                 <input value={template.body} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
