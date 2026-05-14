@@ -7,6 +7,13 @@
   box-shadow: var(--shadow);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(0, 0, 0, 0.32);
+}
+
 .ask-menu {
   display: grid;
   width: 320px;

@@ -533,15 +533,18 @@ export function App() {
       ) : null}
 
       {modal === 'settings' ? (
-        <SettingsWindow
-          config={config}
-          binding={binding}
-          frame={settingsFrame}
-          onClose={() => setModal(null)}
-          onChange={updateConfig}
-          onSave={() => void saveWorkspaceState({ config, canvas, version: workspaceVersion })}
-          onResize={(handle, dx, dy) => setSettingsFrame((frame) => resizeFrame(handle, frame, dx, dy, 360, 260))}
-        />
+        <>
+          <div className="modal-backdrop" />
+          <SettingsWindow
+            config={config}
+            binding={binding}
+            frame={settingsFrame}
+            onClose={() => setModal(null)}
+            onChange={updateConfig}
+            onSave={() => void saveWorkspaceState({ config, canvas, version: workspaceVersion })}
+            onResize={(handle, dx, dy) => setSettingsFrame((frame) => resizeFrame(handle, frame, dx, dy, 360, 260))}
+          />
+        </>
       ) : null}
     </main>
   )
