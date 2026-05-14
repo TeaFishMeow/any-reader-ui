@@ -285,11 +285,6 @@
   color: var(--text);
 }
 
-.template-add {
-  border: 1px solid var(--line);
-  background: var(--title);
-}
-
 .template-delete:hover,
 .template-delete:focus-visible {
   background: #5a1d1d;
