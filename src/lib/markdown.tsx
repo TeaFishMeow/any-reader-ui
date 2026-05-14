@@ -51,6 +51,7 @@ function renderMarkdownHtml(markdown: string, documentPath?: string, highlights:
   const marked = markMarkdownSource(markdown, highlights)
   const displayMarkdown = withFallbackTitle(marked.markdown, documentPath)
   const mathSlots: string[] = []
+  let formulaIndex = 0
   const html = String(
     unified()
       .use(remarkParse)
@@ -59,11 +60,11 @@ function renderMarkdownHtml(markdown: string, documentPath?: string, highlights:
       .use(remarkRehype, {
         handlers: {
           math(_state: unknown, node: { value?: string }) {
-            const index = mathSlots.push(renderMathHtml(node.value ?? '', true)) - 1
+            const index = mathSlots.push(renderMathHtml(node.value ?? '', true, marked.formulas[formulaIndex++])) - 1
             return { type: 'element', tagName: 'anyreader-katex', properties: { 'data-index': String(index) }, children: [] }
           },
           inlineMath(_state: unknown, node: { value?: string }) {
-            const index = mathSlots.push(renderMathHtml(node.value ?? '', false)) - 1
+            const index = mathSlots.push(renderMathHtml(node.value ?? '', false, marked.formulas[formulaIndex++])) - 1
             return { type: 'element', tagName: 'anyreader-katex', properties: { 'data-index': String(index) }, children: [] }
           }
         }
@@ -170,14 +171,18 @@ function renderMath(latex: string, displayMode: boolean, key: Key) {
   }
 }
 
-function renderMathHtml(latex: string, displayMode: boolean) {
+function renderMathHtml(latex: string, displayMode: boolean, highlight?: FormulaRange) {
   const sourceAttrs = `${katexSourceAttribute}="${escapeHtmlAttribute(latex)}" ${katexDisplayAttribute}="${displayMode ? 'true' : 'false'}"`
   const tag = displayMode ? 'div' : 'span'
-  const className = displayMode ? 'math-block' : 'math-inline'
+  const highlighted = highlight?.id && highlight.color ? highlight : null
+  const className = `${displayMode ? 'math-block' : 'math-inline'}${highlighted ? ' qa-source-highlight' : ''}`
+  const highlightAttrs = highlighted
+    ? ` data-qa-record-id="${escapeHtmlAttribute(highlighted.id!)}" style="--qa-highlight-color: ${safeCssColor(highlighted.color!)}"`
+    : ''
   try {
-    return `<${tag} class="${className}" ${sourceAttrs}>${renderToString(latex, { ...katexOptions, displayMode })}</${tag}>`
+    return `<${tag} class="${className}" ${sourceAttrs}${highlightAttrs}>${renderToString(latex, { ...katexOptions, displayMode })}</${tag}>`
   } catch {
-    return `<${tag} class="${className}" ${sourceAttrs}>${escapeHtml(latex)}</${tag}>`
+    return `<${tag} class="${className}" ${sourceAttrs}${highlightAttrs}>${escapeHtml(latex)}</${tag}>`
   }
 }
 
@@ -206,17 +211,21 @@ function escapeHtmlAttribute(input: string) {
 
 type MappedChar = { ch: string; source: number }
 type SourceRange = { id: string; color: string; start: number; end: number }
+type FormulaRange = { start: number; end: number; id?: string; color?: string }
 
 function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
-  if (!highlights.length) return { markdown, markers: [] as Array<SourceRange & { startToken: string; endToken: string }> }
   const map = plainMapForMarkdown(markdown)
   const formulas = mathSourceRanges(markdown)
+  if (!highlights.length) return { markdown, formulas, markers: [] as Array<SourceRange & { startToken: string; endToken: string }> }
   const ranges = highlights
-    .flatMap((highlight) => sourceRangesForHighlight(markdown, map, formulas, highlight))
+    .flatMap((highlight) => sourceRangesForHighlight(markdown, map, highlight))
     .sort((left, right) => left.start - right.start)
+  ranges.forEach((range) => markFormulaHits(range, formulas))
+  const textRanges = ranges
+    .flatMap((range) => removeFormulaParts(markdown, range, formulas))
     .filter((range, index, ranges) => index === 0 || range.start >= ranges[index - 1].end)
 
-  const markers = ranges.map((range, index) => ({
+  const markers = textRanges.map((range, index) => ({
     ...range,
     startToken: `§ARHL${index}S§`,
     endToken: `§ARHL${index}E§`
@@ -226,17 +235,17 @@ function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
     .reverse()
     .reduce((text, marker) => `${text.slice(0, marker.start)}${marker.startToken}${text.slice(marker.start, marker.end)}${marker.endToken}${text.slice(marker.end)}`, markdown)
 
-  return { markdown: nextMarkdown, markers }
+  return { markdown: nextMarkdown, formulas, markers }
 }
 
-function sourceRangesForHighlight(markdown: string, map: { text: string; chars: MappedChar[] }, formulas: Array<{ start: number; end: number }>, highlight: MarkdownHighlight) {
+function sourceRangesForHighlight(markdown: string, map: { text: string; chars: MappedChar[] }, highlight: MarkdownHighlight) {
   const fromPlain = plainRangeForHighlight(map.text, highlight)
   const ranges = fromPlain ? sourceRangesFromPlain(map.chars, fromPlain.start, fromPlain.end, highlight) : []
   if (!ranges.length) {
     const direct = directSourceRange(markdown, highlight)
     if (direct) ranges.push(direct)
   }
-  return mergeSourceRanges(ranges.map((range) => expandFormulaRange(range, formulas)))
+  return mergeSourceRanges(ranges)
 }
 
 function sourceRangesFromPlain(chars: MappedChar[], start: number, end: number, highlight: MarkdownHighlight) {
@@ -296,7 +305,8 @@ function directSourceRange(markdown: string, highlight: MarkdownHighlight): Sour
 }
 
 function textCandidates(input: string) {
-  return [...new Set([input.trim(), markdownToPlainText(input).trim()].filter(Boolean))]
+  const normalized = normalizeSearchText(input)
+  return [...new Set([normalized, normalizeSearchText(markdownToPlainText(input))].filter(Boolean))]
 }
 
 function firstCandidateIndex(text: string, candidates: string[], from: number) {
@@ -324,16 +334,34 @@ function mergeSourceRanges(ranges: SourceRange[]) {
     }, [])
 }
 
-function expandFormulaRange(range: SourceRange, formulas: Array<{ start: number; end: number }>) {
-  return formulas.reduce<SourceRange>((next, formula) => (
-    next.start < formula.end && next.end > formula.start
-      ? { ...next, start: Math.min(next.start, formula.start), end: Math.max(next.end, formula.end) }
-      : next
-  ), range)
+function markFormulaHits(range: SourceRange, formulas: FormulaRange[]) {
+  formulas.forEach((formula) => {
+    if (range.start < formula.end && range.end > formula.start) {
+      formula.id = range.id
+      formula.color = range.color
+    }
+  })
+}
+
+function removeFormulaParts(markdown: string, range: SourceRange, formulas: FormulaRange[]) {
+  const pieces: SourceRange[] = []
+  let cursor = range.start
+  formulas.filter((formula) => range.start < formula.end && range.end > formula.start).forEach((formula) => {
+    pieces.push(trimRange(markdown, { ...range, start: cursor, end: Math.min(range.end, formula.start) }))
+    cursor = Math.max(cursor, formula.end)
+  })
+  pieces.push(trimRange(markdown, { ...range, start: cursor, end: range.end }))
+  return pieces.filter((piece) => piece.start < piece.end)
+}
+
+function trimRange(markdown: string, range: SourceRange) {
+  while (range.start < range.end && /\s/.test(markdown[range.start])) range.start += 1
+  while (range.end > range.start && /\s/.test(markdown[range.end - 1])) range.end -= 1
+  return range
 }
 
 function mathSourceRanges(markdown: string) {
-  const ranges: Array<{ start: number; end: number }> = []
+  const ranges: FormulaRange[] = []
   for (const delimiter of katexDelimiters) {
     let start = markdown.indexOf(delimiter.left)
     while (start >= 0) {
@@ -352,7 +380,7 @@ function mathSourceRanges(markdown: string) {
 }
 
 function plainMapForMarkdown(markdown: string) {
-  let chars = [...markdown].map((ch, source) => ({ ch, source }))
+  let chars = formulaMappedChars(markdown)
   chars = replaceMapped(chars, /```[\s\S]*?```/g, (match) => [{ ch: ' ', source: match.index }])
   chars = replaceMapped(chars, /`([^`]+)`/g, (match) => groupChars(chars, match, 1))
   chars = replaceMapped(chars, /!\[[^\]]*]\([^)]*\)/g, (match) => [{ ch: ' ', source: match.index }])
@@ -366,9 +394,32 @@ function plainMapForMarkdown(markdown: string) {
     { ch: '\n', source: match.index },
     { ch: '\n', source: match.index + 1 }
   ])
-  while (chars[0]?.ch.match(/\s/)) chars.shift()
-  while (chars[chars.length - 1]?.ch.match(/\s/)) chars.pop()
+  chars = chars.filter((item) => !/\s/.test(item.ch))
   return { text: chars.map((item) => item.ch).join(''), chars }
+}
+
+function formulaMappedChars(markdown: string) {
+  const formulas = mathSourceRanges(markdown)
+  const chars: MappedChar[] = []
+  let cursor = 0
+  formulas.forEach((formula) => {
+    chars.push(...[...markdown.slice(cursor, formula.start)].map((ch, index) => ({ ch, source: cursor + index })))
+    chars.push(...[...formulaSearchText(markdown.slice(formula.start, formula.end))].map((ch) => ({ ch, source: formula.start })))
+    cursor = formula.end
+  })
+  chars.push(...[...markdown.slice(cursor)].map((ch, index) => ({ ch, source: cursor + index })))
+  return chars
+}
+
+function formulaSearchText(source: string) {
+  const delimiter = katexDelimiters.find((item) => source.startsWith(item.left) && source.endsWith(item.right))
+  if (!delimiter) return source
+  const latex = source.slice(delimiter.left.length, source.length - delimiter.right.length).trim()
+  return delimiter.display ? `$$${latex}$$` : `$${latex}$`
+}
+
+function normalizeSearchText(input: string) {
+  return formulaMappedChars(input).map((item) => item.ch).join('').replace(/\s+/g, '').trim()
 }
 
 function replaceMapped(chars: MappedChar[], regex: RegExp, replacement: (match: RegExpExecArray) => MappedChar[]) {
