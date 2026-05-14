@@ -43,8 +43,6 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [repo, setRepo] = useState<RepoMeta | null>(null)
-  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
-  const [currentDocument, setCurrentDocument] = useState<DocumentNode | null>(null)
   const [documents, setDocuments] = useState<DocumentNode[]>([])
   const [nodes, setNodes] = useState<SidebarNode[]>([])
   const [config, setConfig] = useState<AppConfig | null>(null)
@@ -67,10 +65,10 @@ export function App() {
   }))
   const [persistState, setPersistState] = useState<'idle' | 'dirty' | 'saving' | 'error'>('idle')
   const activeRuns = useRef(new Map<string, AbortController>())
-  const documentLoadToken = useRef(0)
   const persistTimer = useRef<number | null>(null)
 
   const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
+  const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] ?? null : null
   const activeRecords = useMemo(() => records.filter((record) => !record.lifecycle.isDeleted), [records])
   const templates = useMemo(() => sortTemplates(config?.templates ?? []).filter((template) => template.isEnabled), [config])
 
@@ -120,14 +118,7 @@ export function App() {
         setLoading(true)
         const snapshot: WorkspaceSnapshot = await bootstrapWorkspace()
         if (cancelled) return
-        const initialDocument =
-          snapshot.documents.find((document) => document.id === snapshot.repo.currentDocumentId) ??
-          snapshot.documents.find((document) => document.path === snapshot.config.repository.lastOpenedDocumentPath) ??
-          snapshot.documents[0] ??
-          null
         setRepo(snapshot.repo)
-        setCurrentDocumentId(initialDocument?.id ?? snapshot.repo.currentDocumentId)
-        setCurrentDocument(initialDocument)
         setDocuments(snapshot.documents)
         setNodes(snapshot.sidebarNodes)
         setConfig({ ...snapshot.config, templates: applyPromptTemplateDefaults(snapshot.config.templates) })
@@ -162,12 +153,6 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    if (!currentDocumentId) return
-    const nextDocument = documentMap.get(currentDocumentId)
-    if (nextDocument) setCurrentDocument(nextDocument)
-  }, [currentDocumentId, documentMap])
-
-  useEffect(() => {
     if (!config) return
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
@@ -199,10 +184,6 @@ export function App() {
       documents.find((candidate) => candidate.path === documentId || candidate.id === documentId)
     if (!document) return
 
-    const loadToken = documentLoadToken.current + 1
-    documentLoadToken.current = loadToken
-    setCurrentDocument(document)
-    setCurrentDocumentId(document.id)
     setRepo((previous) =>
       previous ? { ...previous, currentDocumentId: document.id, updatedAt: new Date().toISOString() } : previous
     )
@@ -226,7 +207,6 @@ export function App() {
           updatedAt: new Date().toISOString()
         }
         setDocuments((previous) => previous.map((item) => item.id === loaded.id ? loaded : item))
-        if (documentLoadToken.current === loadToken) setCurrentDocument(loaded)
       } catch (loadError) {
         console.error(loadError)
       }
@@ -237,7 +217,6 @@ export function App() {
       try {
         const loaded = await fetchRemoteDocument(document.id, binding.libraryId)
         setDocuments((previous) => previous.map((item) => item.id === document.id ? loaded : item))
-        if (documentLoadToken.current === loadToken) setCurrentDocument(loaded)
       } catch (loadError) {
         console.error(loadError)
       }
