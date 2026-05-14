@@ -27,11 +27,9 @@
 }
 
 .math-block {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin: 14px 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  background: #181818;
   color: #eeeeee;
 }
 
