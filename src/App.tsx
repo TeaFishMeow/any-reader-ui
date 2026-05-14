@@ -451,6 +451,25 @@ export function App() {
           updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: width, leftSidebarCollapsed: collapsed } }))
         }}
         actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
+        footerClassName="directory-footer"
+        footer={
+          <>
+            <button
+              type="button"
+              aria-label={creditSummary}
+              title={creditSummary}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect()
+                setFloatingMenu((current) => current?.kind === 'model' ? null : { kind: 'model', x: rect.left, y: rect.top })
+              }}
+            >
+              <Icon name="star" />
+              <span>{creditSummary}</span>
+            </button>
+            <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
+          </>
+        }
       >
         <div className="directory-body">
           <Sidebar
@@ -466,20 +485,6 @@ export function App() {
             onOpen={openDocument}
             onAsk={openAsk}
           />
-          <footer className="directory-footer">
-            <button
-              type="button"
-              onMouseDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect()
-                setFloatingMenu((current) => current?.kind === 'model' ? null : { kind: 'model', x: rect.left, y: rect.top })
-              }}
-            >
-              <Icon name="star" />
-              <span>{creditSummary}</span>
-            </button>
-            <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
-          </footer>
         </div>
       </WindowFrame>
 

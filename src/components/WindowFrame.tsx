@@ -64,6 +64,8 @@ export function WindowFrame({
   onResize,
   resizeHandles,
   resizeWhenCollapsed,
+  footer,
+  footerClassName = '',
   children
 }: {
   title?: ReactNode
@@ -76,15 +78,18 @@ export function WindowFrame({
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
   resizeHandles?: ResizeHandle[]
   resizeWhenCollapsed?: boolean
+  footer?: ReactNode
+  footerClassName?: string
   children: ReactNode
 }) {
   return (
-    <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}`} style={style} onMouseDown={onMouseDown}>
+    <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}${footer ? ' has-footer' : ''}`} style={style} onMouseDown={onMouseDown}>
       <header className="window-titlebar" data-window-drag="true" onPointerDown={onTitlePointerDown}>
         <div className="window-title">{title}</div>
         <div className="window-actions">{actions}</div>
       </header>
-      {!collapsed ? <div className="window-body">{children}</div> : null}
+      {!collapsed || footer ? <div className="window-body">{!collapsed ? children : null}</div> : null}
+      {footer ? <footer className={`window-footer ${footerClassName}`}>{footer}</footer> : null}
       {onResize && (!collapsed || resizeWhenCollapsed) ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
     </section>
   )

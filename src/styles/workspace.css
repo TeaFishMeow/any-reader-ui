@@ -27,7 +27,7 @@
 
 .directory-body {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 35px;
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -112,6 +112,20 @@
 .directory-footer button:focus-visible {
   background: var(--hover);
   outline: none;
+}
+
+.directory-window.is-collapsed .directory-footer {
+  grid-template-columns: 1fr;
+}
+
+.directory-window.is-collapsed .directory-footer button {
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+}
+
+.directory-window.is-collapsed .directory-footer button span {
+  display: none;
 }
 
 .reader-body {
