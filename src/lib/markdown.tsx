@@ -2,7 +2,7 @@ import type { Key, ReactNode } from 'react'
 import { renderToString } from 'katex'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AskAction, DocumentNode } from '../../src_original_reference/types/domain'
-import { katexDelimiters, katexOptions } from './katexConfig'
+import { katexDelimiters, katexDisplayAttribute, katexOptions, katexSourceAttribute } from './katexConfig'
 
 export function titleForDocument(document: DocumentNode) {
   return document.title.trim() || document.path.split('/').pop()?.replace(/\.md$/i, '') || document.path
@@ -123,15 +123,19 @@ function isDoubleDollar(text: string, index: number, delimiter: string) {
 }
 
 function renderMath(latex: string, displayMode: boolean, key: Key) {
+  const sourceProps = {
+    [katexSourceAttribute]: latex,
+    [katexDisplayAttribute]: displayMode ? 'true' : 'false'
+  }
   try {
     const html = renderToString(latex, { ...katexOptions, displayMode })
     return displayMode
-      ? <div className="math-block" dangerouslySetInnerHTML={{ __html: html }} key={key} />
-      : <span className="math-inline" dangerouslySetInnerHTML={{ __html: html }} key={key} />
+      ? <div className="math-block" dangerouslySetInnerHTML={{ __html: html }} key={key} {...sourceProps} />
+      : <span className="math-inline" dangerouslySetInnerHTML={{ __html: html }} key={key} {...sourceProps} />
   } catch {
     return displayMode
-      ? <pre className="math-block" key={key}>{latex}</pre>
-      : <code className="math-inline" key={key}>{latex}</code>
+      ? <pre className="math-block" key={key} {...sourceProps}>{latex}</pre>
+      : <code className="math-inline" key={key} {...sourceProps}>{latex}</code>
   }
 }
 
@@ -164,8 +168,9 @@ export function selectionAction(args: {
   sourceQaRecordId?: string
 }): AskAction | null {
   const selection = window.getSelection()
-  const text = selection?.toString().trim()
-  if (!selection || !text) return null
+  if (!selection) return null
+  const text = selectedTextWithKatexSource(selection)
+  if (!text) return null
   const content = args.surfaceText
   const startOffset = content.indexOf(text)
   const endOffset = startOffset >= 0 ? startOffset + text.length : undefined
@@ -187,4 +192,50 @@ export function selectionAction(args: {
     },
     menuPoint: args.eventPoint
   }
+}
+
+function selectedTextWithKatexSource(selection: Selection) {
+  if (selection.rangeCount === 0) return ''
+  const range = selection.getRangeAt(0)
+  const root = range.commonAncestorContainer
+  const parts: string[] = []
+  const usedMath = new Set<Element>()
+  const mathSelector = `[${katexSourceAttribute}]`
+
+  const pushMath = (element: Element) => {
+    if (usedMath.has(element)) return
+    usedMath.add(element)
+    const latex = element.getAttribute(katexSourceAttribute)?.trim()
+    if (!latex) return
+    parts.push(element.getAttribute(katexDisplayAttribute) === 'true' ? `$$${latex}$$` : `$${latex}$`)
+  }
+
+  const collect = (node: Node) => {
+    if (!range.intersectsNode(node)) return
+    if (node.nodeType === Node.TEXT_NODE) {
+      const mathElement = node.parentElement?.closest(mathSelector)
+      if (mathElement) {
+        pushMath(mathElement)
+        return
+      }
+      const value = node.textContent ?? ''
+      const start = node === range.startContainer ? range.startOffset : 0
+      const end = node === range.endContainer ? range.endOffset : value.length
+      parts.push(value.slice(start, end))
+      return
+    }
+
+    if (node instanceof Element) {
+      const mathElement = node.matches(mathSelector) ? node : node.closest(mathSelector)
+      if (mathElement) {
+        pushMath(mathElement)
+        return
+      }
+    }
+
+    node.childNodes.forEach(collect)
+  }
+
+  collect(root)
+  return parts.join('').trim() || selection.toString().trim()
 }

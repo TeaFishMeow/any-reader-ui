@@ -13,3 +13,6 @@ export const katexDelimiters = [
   { left: '\\(', right: '\\)', display: false },
   { left: '$', right: '$', display: false }
 ] as const
+
+export const katexSourceAttribute = 'data-katex-source'
+export const katexDisplayAttribute = 'data-katex-display'
