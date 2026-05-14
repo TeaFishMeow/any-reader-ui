@@ -72,11 +72,6 @@ export function IconButton({
 export function Logo() {
   return (
     <span className="logo">
-      <svg viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-        <path d="M3 2.5h8l6 6v9H3z" />
-        <path d="M11 2.5v6h6" />
-        <path d="M6 12h8M6 15h5" />
-      </svg>
       <strong>AnyReader</strong>
     </span>
   )
