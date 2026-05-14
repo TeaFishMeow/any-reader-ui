@@ -201,6 +201,7 @@ export function selectionAction(args: {
 }): AskAction | null {
   const selection = window.getSelection()
   if (!selection) return null
+  if (selection.isCollapsed) return null
   const text = selectedTextWithKatexSource(selection)
   if (!text) return null
   const content = args.surfaceText
