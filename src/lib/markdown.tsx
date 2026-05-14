@@ -217,12 +217,10 @@ function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
   const map = plainMapForMarkdown(markdown)
   const formulas = mathSourceRanges(markdown)
   if (!highlights.length) return { markdown, formulas, markers: [] as Array<SourceRange & { startToken: string; endToken: string }> }
-  const ranges = highlights
+  const textRanges = highlights
     .flatMap((highlight) => sourceRangesForHighlight(markdown, map, highlight))
     .sort((left, right) => left.start - right.start)
-  ranges.forEach((range) => markFormulaHits(range, formulas))
-  const textRanges = ranges
-    .flatMap((range) => removeFormulaParts(markdown, range, formulas))
+    .flatMap((range) => splitFormulaRanges(markdown, range, formulas))
     .filter((range, index, ranges) => index === 0 || range.start >= ranges[index - 1].end)
 
   const markers = textRanges.map((range, index) => ({
@@ -274,26 +272,20 @@ function plainRangeForHighlight(plainText: string, highlight: MarkdownHighlight)
     return { start: highlight.startOffset, end: highlight.endOffset }
   }
 
-  const match = findPlainMatch(plainText, candidates, highlight)
-  return match.start >= 0 ? { start: match.start, end: match.start + match.text.length } : null
-}
-
-function findPlainMatch(plainText: string, candidates: string[], highlight: MarkdownHighlight) {
-  const prefixes = textCandidates(highlight.contextPrefix ?? '').map((text) => text.slice(-80))
-  for (const prefix of prefixes) {
+  for (const prefix of textCandidates(highlight.contextPrefix ?? '').map((text) => text.slice(-80))) {
     const prefixIndex = plainText.indexOf(prefix)
-    const match = prefixIndex >= 0 ? firstCandidateIndex(plainText, candidates, prefixIndex + prefix.length) : null
-    if (match) return match
+    const match = prefixIndex >= 0 ? candidateIndex(plainText, candidates, prefixIndex + prefix.length) : null
+    if (match) return { start: match.start, end: match.start + match.text.length }
   }
 
-  const suffixes = textCandidates(highlight.contextSuffix ?? '').map((text) => text.slice(0, 80))
-  for (const suffix of suffixes) {
+  for (const suffix of textCandidates(highlight.contextSuffix ?? '').map((text) => text.slice(0, 80))) {
     const suffixIndex = plainText.indexOf(suffix)
-    const match = suffixIndex >= 0 ? lastCandidateIndex(plainText, candidates, suffixIndex) : null
-    if (match) return match
+    const match = suffixIndex >= 0 ? candidateIndex(plainText, candidates, suffixIndex, true) : null
+    if (match) return { start: match.start, end: match.start + match.text.length }
   }
 
-  return firstCandidateIndex(plainText, candidates, 0) ?? { start: -1, text: '' }
+  const match = candidateIndex(plainText, candidates, 0)
+  return match ? { start: match.start, end: match.start + match.text.length } : null
 }
 
 function directSourceRange(markdown: string, highlight: MarkdownHighlight): SourceRange | null {
@@ -309,17 +301,11 @@ function textCandidates(input: string) {
   return [...new Set([normalized, normalizeSearchText(markdownToPlainText(input))].filter(Boolean))]
 }
 
-function firstCandidateIndex(text: string, candidates: string[], from: number) {
+function candidateIndex(text: string, candidates: string[], from: number, backwards = false) {
   return candidates.reduce<{ start: number; text: string } | null>((best, candidate) => {
-    const start = text.indexOf(candidate, from)
-    return start >= 0 && (!best || start < best.start) ? { start, text: candidate } : best
-  }, null)
-}
-
-function lastCandidateIndex(text: string, candidates: string[], before: number) {
-  return candidates.reduce<{ start: number; text: string } | null>((best, candidate) => {
-    const start = text.lastIndexOf(candidate, before)
-    return start >= 0 && (!best || start > best.start) ? { start, text: candidate } : best
+    const start = backwards ? text.lastIndexOf(candidate, from) : text.indexOf(candidate, from)
+    const isBetter = backwards ? !best || start > best.start : !best || start < best.start
+    return start >= 0 && isBetter ? { start, text: candidate } : best
   }, null)
 }
 
@@ -334,19 +320,13 @@ function mergeSourceRanges(ranges: SourceRange[]) {
     }, [])
 }
 
-function markFormulaHits(range: SourceRange, formulas: FormulaRange[]) {
-  formulas.forEach((formula) => {
-    if (range.start < formula.end && range.end > formula.start) {
-      formula.id = range.id
-      formula.color = range.color
-    }
-  })
-}
-
-function removeFormulaParts(markdown: string, range: SourceRange, formulas: FormulaRange[]) {
+function splitFormulaRanges(markdown: string, range: SourceRange, formulas: FormulaRange[]) {
   const pieces: SourceRange[] = []
   let cursor = range.start
-  formulas.filter((formula) => range.start < formula.end && range.end > formula.start).forEach((formula) => {
+  formulas.forEach((formula) => {
+    if (range.start >= formula.end || range.end <= formula.start) return
+    formula.id = range.id
+    formula.color = range.color
     pieces.push(trimRange(markdown, { ...range, start: cursor, end: Math.min(range.end, formula.start) }))
     cursor = Math.max(cursor, formula.end)
   })
