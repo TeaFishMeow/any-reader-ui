@@ -93,6 +93,12 @@
   color: #4daafc;
 }
 
+.markdown-body img {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
 .math-block {
   overflow-x: auto;
   overflow-y: hidden;
@@ -132,8 +138,6 @@
 }
 
 .markdown-figure img {
-  display: block;
-  max-width: 100%;
   border: 1px solid var(--line);
 }
 
