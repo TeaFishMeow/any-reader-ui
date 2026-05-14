@@ -198,6 +198,7 @@ export function App() {
 
     updateConfig((draft) => ({
       ...draft,
+      layout: { ...draft.layout, rightSidebarCollapsed: false },
       repository: { ...draft.repository, lastOpenedDocumentPath: document.path }
     }))
 
