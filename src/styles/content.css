@@ -41,6 +41,25 @@
   color: #eeeeee;
 }
 
+.katex svg {
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: inherit;
+  fill: currentColor;
+  stroke: currentColor;
+  fill-rule: nonzero;
+  fill-opacity: 1;
+  stroke-width: 1;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+}
+
+.katex svg path {
+  fill: currentColor;
+  stroke: none;
+}
+
 .markdown-figure {
   margin: 16px 0;
 }
