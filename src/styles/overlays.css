@@ -252,9 +252,14 @@
   width: 28px;
   height: 26px;
   padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.template-add {
   border: 1px solid var(--line);
   background: var(--title);
-  color: var(--text);
 }
 
 .template-delete:hover,
