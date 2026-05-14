@@ -63,6 +63,7 @@ export function WindowFrame({
   onTitlePointerDown,
   onResize,
   resizeHandles,
+  resizeWhenCollapsed,
   children
 }: {
   title?: ReactNode
@@ -74,6 +75,7 @@ export function WindowFrame({
   onTitlePointerDown?: (event: ReactPointerEvent<HTMLElement>) => void
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
   resizeHandles?: ResizeHandle[]
+  resizeWhenCollapsed?: boolean
   children: ReactNode
 }) {
   return (
@@ -83,7 +85,7 @@ export function WindowFrame({
         <div className="window-actions">{actions}</div>
       </header>
       {!collapsed ? <div className="window-body">{children}</div> : null}
-      {!collapsed && onResize ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
+      {onResize && (!collapsed || resizeWhenCollapsed) ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
     </section>
   )
 }

@@ -442,12 +442,13 @@ export function App() {
         title={<Logo />}
         style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: directoryFrame.h, zIndex: 20 }}
         resizeHandles={['e']}
+        resizeWhenCollapsed
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: 0, y: directoryFrame.y, w: leftWidth, h: directoryFrame.h }, dx, dy, RAIL_WIDTH, 160)
           const collapsed = frame.w < DIRECTORY_AUTO_COLLAPSE_WIDTH
           const width = collapsed ? DIRECTORY_AUTO_COLLAPSE_WIDTH : frame.w
           setDirectoryFrame({ ...frame, x: 0, w: width })
-          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: width, leftSidebarCollapsed: collapsed || draft.layout.leftSidebarCollapsed } }))
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: width, leftSidebarCollapsed: collapsed } }))
         }}
         actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
       >
@@ -488,13 +489,14 @@ export function App() {
         title={<span>{readerTitle}</span>}
         style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
         resizeHandles={['e']}
+        resizeWhenCollapsed
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: readerLeft, y: readerFrame.y, w: Number(readerWidth), h: readerFrame.h }, dx, dy, RAIL_WIDTH, 160)
           const collapsed = frame.w < READER_AUTO_COLLAPSE_WIDTH
           const width = collapsed ? READER_AUTO_COLLAPSE_WIDTH : frame.w
           setReaderMaximized(false)
           setReaderFrame({ ...frame, x: readerLeft, w: width })
-          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarWidth: width, rightSidebarCollapsed: collapsed || draft.layout.rightSidebarCollapsed } }))
+          updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarWidth: width, rightSidebarCollapsed: collapsed } }))
         }}
         actions={
           <>
