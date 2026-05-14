@@ -28,6 +28,12 @@ export function markdownBlocks(markdown: string, documentPath?: string, highligh
   return <MarkdownHtml markdown={markdown} documentPath={documentPath} highlights={highlights} />
 }
 
+export function markedRecordIdFromTarget(target: EventTarget | null) {
+  return target instanceof Element
+    ? target.closest<HTMLElement>('[data-qa-record-id]')?.dataset.qaRecordId
+    : undefined
+}
+
 function withFallbackTitle(markdown: string, documentPath?: string) {
   if (/^#\s+\S/m.test(markdown)) return markdown
   const filename = documentPath?.split('/').pop()?.replace(/\.md$/i, '').trim()

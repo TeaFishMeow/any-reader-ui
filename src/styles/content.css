@@ -171,6 +171,13 @@
   padding: 10px;
 }
 
+.qa-answer.reader-body {
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+}
+
 .detail-window {
   position: relative;
   width: 100%;

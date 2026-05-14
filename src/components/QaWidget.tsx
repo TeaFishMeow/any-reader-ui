@@ -4,7 +4,7 @@ import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AppConfig, AskAction, DocumentNode, QARecord, WidgetState } from '../../src_original_reference/types/domain'
 import type { ResizeFrame } from '../types'
-import { displayAnswerMarkdown, markdownBlocks, renderInlineMath, selectionAction } from '../lib/markdown'
+import { displayAnswerMarkdown, markedRecordIdFromTarget, markdownBlocks, renderInlineMath, selectionAction, type MarkdownHighlight } from '../lib/markdown'
 import { DetailWindow } from './DetailWindow'
 import { IconButton } from './Icon'
 import { resizeFrame, WindowFrame } from './WindowFrame'
@@ -12,6 +12,7 @@ import { resizeFrame, WindowFrame } from './WindowFrame'
 export function QaWidget({
   widget,
   record,
+  highlights,
   documents,
   config,
   onFocus,
@@ -19,10 +20,12 @@ export function QaWidget({
   onToggle,
   onClose,
   onDelete,
-  onAsk
+  onAsk,
+  onOpenRecord
 }: {
   widget: WidgetState
   record: QARecord | null
+  highlights: MarkdownHighlight[]
   documents: DocumentNode[]
   config: AppConfig
   onFocus: () => void
@@ -31,6 +34,7 @@ export function QaWidget({
   onClose: () => void
   onDelete: () => void
   onAsk: (action: AskAction) => void
+  onOpenRecord: (recordId: string) => void
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const drag = (event: React.PointerEvent) => {
@@ -105,8 +109,15 @@ export function QaWidget({
         />
         <div className="question-text">{renderInlineMath(record?.questionText ?? '', `question-${widget.id}`)}</div>
         <article
-          className="markdown-body"
+          className="qa-answer reader-body markdown-body"
           style={{ fontSize: config.rendering.widgetFontPx }}
+          onClick={(event) => {
+            const recordId = markedRecordIdFromTarget(event.target)
+            if (!recordId) return
+            event.preventDefault()
+            event.stopPropagation()
+            onOpenRecord(recordId)
+          }}
           onMouseUp={(event) => {
             const action = record ? selectionAction({
               eventPoint: { x: event.clientX, y: event.clientY + 8 },
@@ -119,7 +130,7 @@ export function QaWidget({
             if (action) onAsk(action)
           }}
         >
-          {markdownBlocks(answerText, sourceDocument?.path)}
+          {markdownBlocks(answerText, sourceDocument?.path, highlights)}
         </article>
       </div>
     </WindowFrame>

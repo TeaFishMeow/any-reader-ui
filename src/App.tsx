@@ -44,8 +44,22 @@ import {
   VIEWPORT_HEIGHT
 } from './constants'
 import { isAbortError } from './lib/errors'
-import { markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
+import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
+
+function highlightForRecord(record: QARecord): MarkdownHighlight {
+  return {
+    id: record.id,
+    text: record.selectedText,
+    color: record.visualStyle.color,
+    startOffset: record.anchor.startOffset,
+    endOffset: record.anchor.endOffset,
+    contextPrefix: record.anchor.contextPrefix,
+    contextSuffix: record.anchor.contextSuffix
+  }
+}
+
+const EMPTY_HIGHLIGHTS: MarkdownHighlight[] = []
 
 export function App() {
   const [loading, setLoading] = useState(true)
@@ -83,16 +97,20 @@ export function App() {
     if (!currentDocument) return []
     return activeRecords
       .filter((record) => record.sourceSurface === 'reader' && record.sourceDocumentId === currentDocument.id && record.selectedText && record.visualStyle.markerType !== 'none')
-      .map((record) => ({
-        id: record.id,
-        text: record.selectedText,
-        color: record.visualStyle.color,
-        startOffset: record.anchor.startOffset,
-        endOffset: record.anchor.endOffset,
-        contextPrefix: record.anchor.contextPrefix,
-        contextSuffix: record.anchor.contextSuffix
-      }))
+      .map(highlightForRecord)
   }, [activeRecords, currentDocument])
+  const widgetHighlights = useMemo(() => {
+    const grouped = new Map<string, MarkdownHighlight[]>()
+    activeRecords.forEach((record) => {
+      if (record.sourceSurface !== 'widget' || !record.selectedText || record.visualStyle.markerType === 'none') return
+      const parentId =
+        record.parentQaRecordId ??
+        (record.anchor.target.surface === 'widget' ? record.anchor.target.sourceQaRecordId : undefined)
+      if (!parentId) return
+      grouped.set(parentId, [...(grouped.get(parentId) ?? []), highlightForRecord(record)])
+    })
+    return grouped
+  }, [activeRecords])
 
   const schedulePersist = useCallback((nextConfig: AppConfig | null, nextCanvas: CanvasState | null) => {
     if (!nextConfig || !nextCanvas) return
@@ -450,6 +468,7 @@ export function App() {
               key={widget.id}
               widget={widget}
               record={record}
+              highlights={record ? widgetHighlights.get(record.id) ?? EMPTY_HIGHLIGHTS : EMPTY_HIGHLIGHTS}
               documents={documents}
               config={config}
               onFocus={() => updateCanvas((draft) => {
@@ -468,6 +487,7 @@ export function App() {
               onClose={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))}
               onDelete={() => void removeRecord(record, widget.id)}
               onAsk={openAsk}
+              onOpenRecord={openRecordWidget}
             />
           )
         })}
@@ -556,8 +576,7 @@ export function App() {
           className="reader-body markdown-body"
           style={{ fontSize: config.rendering.readerFontPx }}
           onClick={(event) => {
-            const marker = (event.target as HTMLElement).closest<HTMLElement>('[data-qa-record-id]')
-            const recordId = marker?.dataset.qaRecordId
+            const recordId = markedRecordIdFromTarget(event.target)
             if (!recordId) return
             event.preventDefault()
             event.stopPropagation()
