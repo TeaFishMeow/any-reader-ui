@@ -168,16 +168,3 @@
   border-top: 1px solid var(--line);
   background: var(--title);
 }
-
-.persist-status {
-  position: fixed;
-  right: 8px;
-  bottom: 6px;
-  z-index: 150;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.persist-status.error {
-  color: var(--danger);
-}

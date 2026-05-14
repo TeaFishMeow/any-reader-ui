@@ -538,8 +538,6 @@ export function App() {
           onResize={(handle, dx, dy) => setSettingsFrame((frame) => resizeFrame(handle, frame, dx, dy, 360, 260))}
         />
       ) : null}
-
-      <div className={`persist-status ${persistState}`}>{persistState}</div>
     </main>
   )
 }
