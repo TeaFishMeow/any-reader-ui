@@ -267,8 +267,32 @@ export function App() {
     }, true)
   }
 
+  function createQaRecordWidget(draft: CanvasState, recordId: string): WidgetState {
+    const frame = nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight })
+    const viewport = normalizeCanvasViewport(draft.viewport)
+    const leftPanelWidth = config!.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
+    const readerPanelWidth = config!.layout.rightSidebarCollapsed
+      ? RAIL_WIDTH
+      : readerMaximized
+        ? window.innerWidth - leftPanelWidth
+        : readerFrame.w
+    const offset = draft.widgetStates.length % 8
+    const screenX = leftPanelWidth + readerPanelWidth + 18 + offset * 18
+    const screenY = 16 + offset * 16
+
+    return {
+      ...frame,
+      position: {
+        x: Math.round((screenX - viewport.x) / viewport.zoom),
+        y: Math.round((screenY - viewport.y) / viewport.zoom)
+      },
+      type: 'qa-record',
+      props: { qaRecordId: recordId }
+    }
+  }
+
   function openRecordWidget(recordId: string) {
-    if (!canvas || !activeRecords.some((record) => record.id === recordId)) return
+    if (!canvas || !config || !activeRecords.some((record) => record.id === recordId)) return
     setAskMenu(null)
     updateCanvas((draft) => {
       const zIndex = Math.max(0, ...draft.widgetStates.map((widget) => widget.zIndex)) + 1
@@ -282,12 +306,7 @@ export function App() {
           selection: { widgetId: existing.id }
         }
       }
-      const widget: WidgetState = {
-        ...nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight }),
-        zIndex,
-        type: 'qa-record',
-        props: { qaRecordId: recordId }
-      }
+      const widget = createQaRecordWidget(draft, recordId)
       return { ...draft, widgetStates: [...draft.widgetStates, widget], selection: { widgetId: widget.id } }
     }, true)
   }
@@ -363,29 +382,7 @@ export function App() {
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
-    openWidget((draft) => {
-      const frame = nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight })
-      const viewport = normalizeCanvasViewport(draft.viewport)
-      const leftPanelWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
-      const readerPanelWidth = config.layout.rightSidebarCollapsed
-        ? RAIL_WIDTH
-        : readerMaximized
-          ? window.innerWidth - leftPanelWidth
-          : readerFrame.w
-      const offset = draft.widgetStates.length % 8
-      const screenX = leftPanelWidth + readerPanelWidth + 18 + offset * 18
-      const screenY = 16 + offset * 16
-
-      return {
-        ...frame,
-        position: {
-          x: Math.round((screenX - viewport.x) / viewport.zoom),
-          y: Math.round((screenY - viewport.y) / viewport.zoom)
-        },
-        type: 'qa-record',
-        props: { qaRecordId: record.id }
-      }
-    })
+    openWidget((draft) => createQaRecordWidget(draft, record.id))
     void runRecord(record)
   }
 
