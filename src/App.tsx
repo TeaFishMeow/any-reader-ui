@@ -458,9 +458,10 @@ export function App() {
           <footer className="directory-footer">
             <button
               type="button"
+              onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect()
-                setFloatingMenu({ kind: 'model', x: rect.left, y: rect.top })
+                setFloatingMenu((current) => current?.kind === 'model' ? null : { kind: 'model', x: rect.left, y: rect.top })
               }}
             >
               <Icon name="star" />
