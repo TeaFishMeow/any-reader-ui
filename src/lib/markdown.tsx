@@ -1,4 +1,4 @@
-import type { Key, ReactNode } from 'react'
+import { memo, useMemo, type Key, type ReactNode } from 'react'
 import { renderToString } from 'katex'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
@@ -15,8 +15,19 @@ export function titleForDocument(document: DocumentNode) {
 }
 
 export function markdownBlocks(markdown: string, documentPath?: string) {
-  return <div dangerouslySetInnerHTML={{ __html: renderMarkdownHtml(markdown, documentPath) }} />
+  return <MarkdownHtml markdown={markdown} documentPath={documentPath} />
 }
+
+const MarkdownHtml = memo(function MarkdownHtml({
+  markdown,
+  documentPath
+}: {
+  markdown: string
+  documentPath?: string
+}) {
+  const html = useMemo(() => renderMarkdownHtml(markdown, documentPath), [markdown, documentPath])
+  return <div dangerouslySetInnerHTML={{ __html: html }} />
+})
 
 function renderMarkdownHtml(markdown: string, documentPath?: string) {
   const mathSlots: string[] = []
