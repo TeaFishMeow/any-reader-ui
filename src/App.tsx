@@ -267,6 +267,31 @@ export function App() {
     }, true)
   }
 
+  function openRecordWidget(recordId: string) {
+    if (!canvas || !activeRecords.some((record) => record.id === recordId)) return
+    setAskMenu(null)
+    updateCanvas((draft) => {
+      const zIndex = Math.max(0, ...draft.widgetStates.map((widget) => widget.zIndex)) + 1
+      const existing = draft.widgetStates.find((widget) => widget.type === 'qa-record' && widget.props.qaRecordId === recordId)
+      if (existing) {
+        return {
+          ...draft,
+          widgetStates: draft.widgetStates.map((widget) =>
+            widget.id === existing.id ? { ...widget, zIndex, isCollapsed: false } : widget
+          ),
+          selection: { widgetId: existing.id }
+        }
+      }
+      const widget: WidgetState = {
+        ...nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight }),
+        zIndex,
+        type: 'qa-record',
+        props: { qaRecordId: recordId }
+      }
+      return { ...draft, widgetStates: [...draft.widgetStates, widget], selection: { widgetId: widget.id } }
+    }, true)
+  }
+
   async function runRecord(seed: QARecord) {
     if (!config) return
     const controller = new AbortController()
@@ -533,6 +558,14 @@ export function App() {
           key={currentDocument.id}
           className="reader-body markdown-body"
           style={{ fontSize: config.rendering.readerFontPx }}
+          onClick={(event) => {
+            const marker = (event.target as HTMLElement).closest<HTMLElement>('[data-qa-record-id]')
+            const recordId = marker?.dataset.qaRecordId
+            if (!recordId) return
+            event.preventDefault()
+            event.stopPropagation()
+            openRecordWidget(recordId)
+          }}
           onMouseUp={(event) => {
             const action = selectionAction({
               eventPoint: { x: event.clientX, y: event.clientY + 8 },
