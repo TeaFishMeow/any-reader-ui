@@ -390,7 +390,7 @@ export function App() {
       <div className="canvas-grid" style={{ backgroundPosition: `${viewport.x}px ${viewport.y}px` }} />
       <div
         className="canvas-scene"
-        style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
+        style={{ zIndex: 1, transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
       >
         {visibleWidgets.map((widget) => {
           const record = widget.type === 'qa-record' ? activeRecords.find((item) => item.id === widget.props.qaRecordId) ?? null : null

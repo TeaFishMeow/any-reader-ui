@@ -35,6 +35,7 @@ export function QaWidget({
   const [detailsOpen, setDetailsOpen] = useState(false)
   const drag = (event: React.PointerEvent) => {
     if ((event.target as HTMLElement).closest('button,input,textarea')) return
+    onFocus()
     event.preventDefault()
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
