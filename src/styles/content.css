@@ -32,9 +32,15 @@
   padding: 12px;
   border: 1px solid var(--line);
   background: #181818;
-  color: #dcdcaa;
-  font-family: Consolas, "SFMono-Regular", monospace;
-  white-space: pre-wrap;
+  color: #eeeeee;
+}
+
+.math-block .katex-display {
+  margin: 0;
+}
+
+.math-inline {
+  color: #eeeeee;
 }
 
 .markdown-figure {

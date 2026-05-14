@@ -1,4 +1,5 @@
 import { makeSummary } from '../../src_original_reference/lib/text'
+import { renderInlineMath } from '../lib/markdown'
 import { IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
 
@@ -23,11 +24,11 @@ export function DetailWindow({
       <div className="detail-body">
         <div>
           <span>选中</span>
-          <p>{selectedText}</p>
+          <p>{renderInlineMath(selectedText, 'detail-selected')}</p>
         </div>
         <div>
           <span>上下文</span>
-          <p>{makeSummary(context, 360)}</p>
+          <p>{renderInlineMath(makeSummary(context, 360), 'detail-context')}</p>
         </div>
       </div>
     </WindowFrame>

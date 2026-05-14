@@ -4,7 +4,7 @@ import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AppConfig, AskAction, DocumentNode, QARecord, WidgetState } from '../../src_original_reference/types/domain'
 import type { ResizeFrame } from '../types'
-import { displayAnswerMarkdown, markdownBlocks, selectionAction } from '../lib/markdown'
+import { displayAnswerMarkdown, markdownBlocks, renderInlineMath, selectionAction } from '../lib/markdown'
 import { DetailWindow } from './DetailWindow'
 import { IconButton } from './Icon'
 import { resizeFrame, WindowFrame } from './WindowFrame'
@@ -103,7 +103,7 @@ export function QaWidget({
           context={record?.readingContextSnapshot ?? ''}
           onToggle={() => setDetailsOpen((value) => !value)}
         />
-        <div className="question-text">{record?.questionText}</div>
+        <div className="question-text">{renderInlineMath(record?.questionText ?? '', `question-${widget.id}`)}</div>
         <article
           className="markdown-body"
           style={{ fontSize: config.rendering.widgetFontPx }}
