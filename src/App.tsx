@@ -361,6 +361,7 @@ export function App() {
   const leftWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
   const readerLeft = leftWidth
   const readerWidth = config.layout.rightSidebarCollapsed ? RAIL_WIDTH : readerMaximized ? window.innerWidth - readerLeft : readerFrame.w
+  const readerTitle = currentDocument.path.split('/').slice(0, -1).join('/')
   const viewport = normalizeCanvasViewport(canvas.viewport)
   const visibleWidgets = canvas.widgetStates.filter((widget) => {
     if (widget.type === 'ask') return true
@@ -468,7 +469,7 @@ export function App() {
       <WindowFrame
         className="reader-window"
         collapsed={config.layout.rightSidebarCollapsed}
-        title={<span />}
+        title={<span>{readerTitle}</span>}
         style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
         resizeHandles={['e']}
         onResize={(handle, dx, dy) => {
@@ -501,7 +502,6 @@ export function App() {
             if (action) openAsk(action)
           }}
         >
-          <div className="reader-path">{currentDocument.path}</div>
           {markdownBlocks(currentDocument.contentMd, currentDocument.path)}
         </article>
       </WindowFrame>

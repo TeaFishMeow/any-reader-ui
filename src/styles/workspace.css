@@ -121,12 +121,3 @@
   color: #d4d4d4;
   line-height: 1.76;
 }
-
-.reader-path {
-  margin-bottom: 18px;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
