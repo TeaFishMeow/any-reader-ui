@@ -14,11 +14,12 @@
   height: 35px;
 }
 
-.window-frame.has-footer {
-  grid-template-rows: 35px minmax(0, 1fr) auto;
+.window-frame.has-footer,
+.window-frame.is-collapsed.has-collapsed-blank {
+  grid-template-rows: 35px minmax(0, 1fr);
 }
 
-.window-frame.is-collapsed.has-footer {
+.window-frame.is-collapsed.has-collapsed-blank.has-footer {
   grid-template-rows: 35px minmax(0, 1fr) auto;
 }
 
@@ -57,6 +58,21 @@
 
 .window-footer {
   min-width: 0;
+}
+
+.window-collapsed-blank {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.window-collapsed-blank:hover,
+.window-collapsed-blank:focus-visible {
+  background: var(--hover);
+  outline: none;
 }
 
 .resize-handle {

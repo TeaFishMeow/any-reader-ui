@@ -60,6 +60,7 @@ export function WindowFrame({
   collapsed,
   style,
   onMouseDown,
+  onCollapsedBlankClick,
   onTitlePointerDown,
   onResize,
   resizeHandles,
@@ -74,6 +75,7 @@ export function WindowFrame({
   collapsed?: boolean
   style?: CSSProperties
   onMouseDown?: () => void
+  onCollapsedBlankClick?: () => void
   onTitlePointerDown?: (event: ReactPointerEvent<HTMLElement>) => void
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void
   resizeHandles?: ResizeHandle[]
@@ -82,13 +84,14 @@ export function WindowFrame({
   footerClassName?: string
   children: ReactNode
 }) {
+  const collapsedBlank = collapsed && onCollapsedBlankClick
   return (
-    <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}${footer ? ' has-footer' : ''}`} style={style} onMouseDown={onMouseDown}>
+    <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}${footer ? ' has-footer' : ''}${collapsedBlank ? ' has-collapsed-blank' : ''}`} style={style} onMouseDown={onMouseDown}>
       <header className="window-titlebar" data-window-drag="true" onPointerDown={onTitlePointerDown}>
         <div className="window-title">{title}</div>
         <div className="window-actions">{actions}</div>
       </header>
-      {!collapsed || footer ? <div className="window-body">{!collapsed ? children : null}</div> : null}
+      {collapsedBlank ? <button className="window-collapsed-blank" type="button" aria-label="展开" onClick={onCollapsedBlankClick} /> : !collapsed || footer ? <div className="window-body">{!collapsed ? children : null}</div> : null}
       {footer ? <footer className={`window-footer ${footerClassName}`}>{footer}</footer> : null}
       {onResize && (!collapsed || resizeWhenCollapsed) ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
     </section>

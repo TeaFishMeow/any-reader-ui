@@ -443,6 +443,7 @@ export function App() {
         style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: directoryFrame.h, zIndex: 20 }}
         resizeHandles={['e']}
         resizeWhenCollapsed
+        onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: false } }))}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: 0, y: directoryFrame.y, w: leftWidth, h: directoryFrame.h }, dx, dy, RAIL_WIDTH, 160)
           const collapsed = frame.w < DIRECTORY_AUTO_COLLAPSE_WIDTH
@@ -495,6 +496,7 @@ export function App() {
         style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
         resizeHandles={['e']}
         resizeWhenCollapsed
+        onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: false } }))}
         onResize={(handle, dx, dy) => {
           const frame = resizeFrame(handle, { x: readerLeft, y: readerFrame.y, w: Number(readerWidth), h: readerFrame.h }, dx, dy, RAIL_WIDTH, 160)
           const collapsed = frame.w < READER_AUTO_COLLAPSE_WIDTH
