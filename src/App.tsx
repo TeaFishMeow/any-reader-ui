@@ -440,7 +440,7 @@ export function App() {
         className="directory-window"
         collapsed={config.layout.leftSidebarCollapsed}
         title={<Logo />}
-        style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: directoryFrame.h, zIndex: 20 }}
+        style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: '100vh', zIndex: 20 }}
         resizeHandles={['e']}
         resizeWhenCollapsed
         onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: false } }))}
@@ -493,7 +493,7 @@ export function App() {
         className="reader-window"
         collapsed={config.layout.rightSidebarCollapsed}
         title={<span>{readerTitle}</span>}
-        style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: readerFrame.h, zIndex: 18 }}
+        style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: '100vh', zIndex: 18 }}
         resizeHandles={['e']}
         resizeWhenCollapsed
         onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: false } }))}
