@@ -1,5 +1,11 @@
 import type { Key, ReactNode } from 'react'
 import { renderToString } from 'katex'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import remarkRehype from 'remark-rehype'
+import rehypeStringify from 'rehype-stringify'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AskAction, DocumentNode } from '../../src_original_reference/types/domain'
 import { katexDelimiters, katexDisplayAttribute, katexOptions, katexSourceAttribute } from './katexConfig'
@@ -9,52 +15,39 @@ export function titleForDocument(document: DocumentNode) {
 }
 
 export function markdownBlocks(markdown: string, documentPath?: string) {
-  const chunks = markdown.split(/\n{2,}/)
-  return chunks.map((raw, index) => {
-    const block = raw.trim()
-    if (!block) return null
-    const image = block.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*(.*)$/s)
-    if (image) {
-      return (
-        <figure className="markdown-figure" key={index}>
-          <img src={resolveAssetPath(documentPath, image[2])} alt={image[1]} />
-          {image[3].trim() ? <figcaption>{renderInlineMath(image[3].trim(), `caption-${index}`)}</figcaption> : null}
-        </figure>
-      )
-    }
-    const mathBlock = parseBlockMath(block)
-    if (mathBlock) {
-      return renderMath(mathBlock.latex, true, index)
-    }
-    if (/^#{1,6}\s/.test(block)) {
-      const text = block.replace(/^#{1,6}\s*/, '')
-      if (block.startsWith('# ')) return <h1 key={index}>{renderInlineMath(text, `h1-${index}`)}</h1>
-      if (block.startsWith('## ')) return <h2 key={index}>{renderInlineMath(text, `h2-${index}`)}</h2>
-      return <h3 key={index}>{renderInlineMath(text, `h3-${index}`)}</h3>
-    }
-    if (/^[-*]\s/m.test(block)) {
-      return (
-        <ul key={index}>
-          {block.split(/\n/).map((line, itemIndex) => (
-            <li key={itemIndex}>{renderInlineMath(line.replace(/^[-*]\s*/, ''), `li-${index}-${itemIndex}`)}</li>
-          ))}
-        </ul>
-      )
-    }
-    return <p key={index}>{renderInlineMath(block, `p-${index}`)}</p>
-  })
+  return <div dangerouslySetInnerHTML={{ __html: renderMarkdownHtml(markdown, documentPath) }} />
 }
 
-function parseBlockMath(block: string) {
-  for (const delimiter of katexDelimiters) {
-    if (!delimiter.display) continue
-    if (block.startsWith(delimiter.left) && block.endsWith(delimiter.right)) {
-      return {
-        latex: block.slice(delimiter.left.length, block.length - delimiter.right.length).trim()
-      }
-    }
-  }
-  return null
+function renderMarkdownHtml(markdown: string, documentPath?: string) {
+  const mathSlots: string[] = []
+  const html = String(
+    unified()
+      .use(remarkParse)
+      .use(remarkGfm)
+      .use(remarkMath)
+      .use(remarkRehype, {
+        handlers: {
+          math(_state: unknown, node: { value?: string }) {
+            const index = mathSlots.push(renderMathHtml(node.value ?? '', true)) - 1
+            return { type: 'element', tagName: 'anyreader-katex', properties: { 'data-index': String(index) }, children: [] }
+          },
+          inlineMath(_state: unknown, node: { value?: string }) {
+            const index = mathSlots.push(renderMathHtml(node.value ?? '', false)) - 1
+            return { type: 'element', tagName: 'anyreader-katex', properties: { 'data-index': String(index) }, children: [] }
+          }
+        }
+      })
+      .use(rehypeStringify)
+      .processSync(markdown)
+  )
+
+  return mathSlots.reduce(
+    (nextHtml, slot, index) =>
+      nextHtml.replaceAll(`<anyreader-katex data-index="${index}"></anyreader-katex>`, slot),
+    html
+  ).replace(/(<img\b[^>]*\bsrc=")([^"]*)(")/g, (_match, prefix: string, src: string, suffix: string) =>
+    `${prefix}${escapeHtmlAttribute(resolveAssetPath(documentPath, src))}${suffix}`
+  )
 }
 
 export function renderInlineMath(text: string, keyPrefix: string) {
@@ -139,6 +132,17 @@ function renderMath(latex: string, displayMode: boolean, key: Key) {
   }
 }
 
+function renderMathHtml(latex: string, displayMode: boolean) {
+  const sourceAttrs = `${katexSourceAttribute}="${escapeHtmlAttribute(latex)}" ${katexDisplayAttribute}="${displayMode ? 'true' : 'false'}"`
+  const tag = displayMode ? 'div' : 'span'
+  const className = displayMode ? 'math-block' : 'math-inline'
+  try {
+    return `<${tag} class="${className}" ${sourceAttrs}>${renderToString(latex, { ...katexOptions, displayMode })}</${tag}>`
+  } catch {
+    return `<${tag} class="${className}" ${sourceAttrs}>${escapeHtml(latex)}</${tag}>`
+  }
+}
+
 function resolveAssetPath(documentPath: string | undefined, raw: string) {
   if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
   const base = documentPath ? documentPath.split('/').slice(0, -1) : []
@@ -149,6 +153,17 @@ function resolveAssetPath(documentPath: string | undefined, raw: string) {
     else output.push(part)
   }
   return `/vault/${output.map(encodeURIComponent).join('/')}`
+}
+
+function escapeHtml(input: string) {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function escapeHtmlAttribute(input: string) {
+  return escapeHtml(input).replace(/"/g, '&quot;')
 }
 
 export function plainContextForDocument(document: DocumentNode) {

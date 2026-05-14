@@ -17,13 +17,80 @@
   font-size: 16px;
 }
 
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 18px 0 8px;
+  color: #eeeeee;
+  font-size: 14px;
+}
+
 .markdown-body p {
   margin: 0 0 1em;
 }
 
-.markdown-body ul {
+.markdown-body ul,
+.markdown-body ol {
   margin: 0 0 1em 18px;
   padding: 0;
+}
+
+.markdown-body li {
+  margin: 3px 0;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 1em;
+  padding-left: 14px;
+  border-left: 3px solid var(--line);
+  color: #bbbbbb;
+}
+
+.markdown-body hr {
+  height: 1px;
+  margin: 22px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.markdown-body code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #2a2a2a;
+  font-family: Consolas, "SFMono-Regular", monospace;
+}
+
+.markdown-body pre {
+  overflow: auto;
+  margin: 0 0 1em;
+  padding: 10px 12px;
+  background: #181818;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-body table {
+  width: 100%;
+  margin: 0 0 1em;
+  border-collapse: collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+}
+
+.markdown-body th {
+  background: #2a2a2a;
+  font-weight: 600;
+}
+
+.markdown-body a {
+  color: #4daafc;
 }
 
 .math-block {

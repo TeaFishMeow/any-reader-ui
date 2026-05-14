@@ -36,7 +36,8 @@
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
-    "remark-rehype": "^11.1.2"
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
