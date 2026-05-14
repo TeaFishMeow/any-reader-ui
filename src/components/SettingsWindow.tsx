@@ -98,36 +98,35 @@ export function SettingsWindow({
         </section>
         <section id="settings-templates" className="settings-wide">
           <h2>提问选项</h2>
-          <button className="settings-command" type="button" onClick={() => onChange((draft) => ({
-            ...draft,
-            templates: [
-              ...draft.templates,
-              {
-                id: createId('template'),
-                title: '新选项',
-                body: '输入提示词。',
-                color: '#569cd6',
-                order: draft.templates.length,
-                isBuiltIn: false,
-                isEnabled: true,
-                scope: 'global'
-              }
-            ]
-          }))}>
-            <Icon name="plus" />
-            <span>新增</span>
-          </button>
           <div className="template-list">
             {templates.map((template) => (
               <div className="template-row" key={template.id}>
+                <input type="checkbox" checked={template.isEnabled} aria-label="启用" onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
                 <input value={template.title} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
                 <input value={template.body} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
-                <label className="inline-check">
-                  <input type="checkbox" checked={template.isEnabled} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
-                  <span>启用</span>
-                </label>
+                <button className="template-delete" type="button" aria-label="删除" onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
+                  <Icon name="close" />
+                </button>
               </div>
             ))}
+            <button className="template-add" type="button" aria-label="新增" onClick={() => onChange((draft) => ({
+              ...draft,
+              templates: [
+                ...draft.templates,
+                {
+                  id: createId('template'),
+                  title: '新选项',
+                  body: '输入提示词。',
+                  color: '#569cd6',
+                  order: draft.templates.length,
+                  isBuiltIn: false,
+                  isEnabled: true,
+                  scope: 'global'
+                }
+              ]
+            }))}>
+              <Icon name="plus" />
+            </button>
           </div>
         </section>
         </div>
