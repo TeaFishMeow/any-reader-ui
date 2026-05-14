@@ -70,15 +70,47 @@
 
 .settings-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: 150px minmax(0, 1fr);
   height: calc(100% - 35px);
+  overflow: hidden;
+}
+
+.settings-nav {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.settings-nav button {
+  height: 30px;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.settings-nav button:hover,
+.settings-nav button:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.settings-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 18px;
   overflow: auto;
   padding: 16px;
 }
 
-.settings-body section {
+.settings-content section {
   min-width: 0;
+  scroll-margin-top: 12px;
 }
 
 .settings-wide {

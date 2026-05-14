@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, RepositoryBinding } from '../../src_original_reference/types/domain'
@@ -23,6 +24,13 @@ export function SettingsWindow({
   onResize: (handle: ResizeHandle, dx: number, dy: number) => void
 }) {
   const templates = sortTemplates(config.templates)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const sections = [
+    ['settings-provider', 'Provider'],
+    ['settings-shortcuts', '快捷键'],
+    ['settings-repository', 'Repository'],
+    ['settings-templates', '提问选项']
+  ] as const
   return (
     <WindowFrame
       className="settings-window"
@@ -32,7 +40,20 @@ export function SettingsWindow({
       onResize={onResize}
     >
       <div className="settings-body">
-        <section>
+        <aside className="settings-nav">
+          {sections.map(([id, label]) => (
+            <button key={id} type="button" onClick={() => {
+              const container = contentRef.current
+              const target = document.getElementById(id)
+              if (!container || !target) return
+              container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top
+            }}>
+              {label}
+            </button>
+          ))}
+        </aside>
+        <div className="settings-content" ref={contentRef}>
+        <section id="settings-provider">
           <h2>Provider</h2>
           <label>
             <span>Base URL</span>
@@ -51,7 +72,7 @@ export function SettingsWindow({
             <input type="number" min="0" max="2" step="0.1" value={config.provider.temperature} onChange={(event) => onChange((draft) => ({ ...draft, provider: { ...draft.provider, temperature: Number(event.target.value) } }))} />
           </label>
         </section>
-        <section>
+        <section id="settings-shortcuts">
           <h2>快捷键</h2>
           {([
             ['toggleLeft', '目录'],
@@ -64,7 +85,7 @@ export function SettingsWindow({
             </label>
           ))}
         </section>
-        <section>
+        <section id="settings-repository">
           <h2>Repository</h2>
           <label>
             <span>Mode</span>
@@ -75,7 +96,7 @@ export function SettingsWindow({
             <input readOnly value={binding?.sourceLabel ?? config.repository.mountedVaultPath ?? ''} />
           </label>
         </section>
-        <section className="settings-wide">
+        <section id="settings-templates" className="settings-wide">
           <h2>提问选项</h2>
           <button className="settings-command" type="button" onClick={() => onChange((draft) => ({
             ...draft,
@@ -109,6 +130,7 @@ export function SettingsWindow({
             ))}
           </div>
         </section>
+        </div>
       </div>
       <footer className="settings-footer">
         <button className="settings-command primary" type="button" onClick={onSave}>
