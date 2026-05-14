@@ -315,11 +315,29 @@ export function App() {
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
-    openWidget((draft) => ({
-      ...nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight }),
-      type: 'qa-record',
-      props: { qaRecordId: record.id }
-    }))
+    openWidget((draft) => {
+      const frame = nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight })
+      const viewport = normalizeCanvasViewport(draft.viewport)
+      const leftPanelWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
+      const readerPanelWidth = config.layout.rightSidebarCollapsed
+        ? RAIL_WIDTH
+        : readerMaximized
+          ? window.innerWidth - leftPanelWidth
+          : readerFrame.w
+      const offset = draft.widgetStates.length % 8
+      const screenX = leftPanelWidth + readerPanelWidth + 18 + offset * 18
+      const screenY = 16 + offset * 16
+
+      return {
+        ...frame,
+        position: {
+          x: Math.round((screenX - viewport.x) / viewport.zoom),
+          y: Math.round((screenY - viewport.y) / viewport.zoom)
+        },
+        type: 'qa-record',
+        props: { qaRecordId: record.id }
+      }
+    })
     void runRecord(record)
   }
 
