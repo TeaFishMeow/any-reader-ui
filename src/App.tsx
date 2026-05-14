@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from '../src_original_reference/lib/bootstrap'
 import { fetchRemoteDocument } from '../src_original_reference/lib/api'
 import { applyPromptTemplateDefaults, MAIN_CANVAS_ID } from '../src_original_reference/lib/defaults'
+import { readMountedVaultTextFile } from '../src_original_reference/lib/fs'
 import {
   buildPendingAskSession,
   createPendingRecord,
@@ -11,6 +12,7 @@ import {
   upsertQaRecord
 } from '../src_original_reference/lib/app-helpers'
 import { buildModelInfo, streamAnswer } from '../src_original_reference/lib/provider'
+import { hashString, markdownToPlainText } from '../src_original_reference/lib/text'
 import type {
   AppConfig,
   AskAction,
@@ -41,6 +43,8 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [repo, setRepo] = useState<RepoMeta | null>(null)
+  const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null)
+  const [currentDocument, setCurrentDocument] = useState<DocumentNode | null>(null)
   const [documents, setDocuments] = useState<DocumentNode[]>([])
   const [nodes, setNodes] = useState<SidebarNode[]>([])
   const [config, setConfig] = useState<AppConfig | null>(null)
@@ -63,10 +67,10 @@ export function App() {
   }))
   const [persistState, setPersistState] = useState<'idle' | 'dirty' | 'saving' | 'error'>('idle')
   const activeRuns = useRef(new Map<string, AbortController>())
+  const documentLoadToken = useRef(0)
   const persistTimer = useRef<number | null>(null)
 
   const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
-  const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] ?? null : null
   const activeRecords = useMemo(() => records.filter((record) => !record.lifecycle.isDeleted), [records])
   const templates = useMemo(() => sortTemplates(config?.templates ?? []).filter((template) => template.isEnabled), [config])
 
@@ -116,7 +120,14 @@ export function App() {
         setLoading(true)
         const snapshot: WorkspaceSnapshot = await bootstrapWorkspace()
         if (cancelled) return
+        const initialDocument =
+          snapshot.documents.find((document) => document.id === snapshot.repo.currentDocumentId) ??
+          snapshot.documents.find((document) => document.path === snapshot.config.repository.lastOpenedDocumentPath) ??
+          snapshot.documents[0] ??
+          null
         setRepo(snapshot.repo)
+        setCurrentDocumentId(initialDocument?.id ?? snapshot.repo.currentDocumentId)
+        setCurrentDocument(initialDocument)
         setDocuments(snapshot.documents)
         setNodes(snapshot.sidebarNodes)
         setConfig({ ...snapshot.config, templates: applyPromptTemplateDefaults(snapshot.config.templates) })
@@ -151,6 +162,12 @@ export function App() {
   }, [])
 
   useEffect(() => {
+    if (!currentDocumentId) return
+    const nextDocument = documentMap.get(currentDocumentId)
+    if (nextDocument) setCurrentDocument(nextDocument)
+  }, [currentDocumentId, documentMap])
+
+  useEffect(() => {
     if (!config) return
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
@@ -177,21 +194,53 @@ export function App() {
 
   async function openDocument(documentId: string) {
     if (!repo || !config) return
-    const document = documentMap.get(documentId)
-    if (binding?.activeSourceMode === 'remote-library' && document && !document.isContentLoaded && binding.libraryId) {
+    const document =
+      documentMap.get(documentId) ??
+      documents.find((candidate) => candidate.path === documentId || candidate.id === documentId)
+    if (!document) return
+
+    const loadToken = documentLoadToken.current + 1
+    documentLoadToken.current = loadToken
+    setCurrentDocument(document)
+    setCurrentDocumentId(document.id)
+    setRepo((previous) =>
+      previous ? { ...previous, currentDocumentId: document.id, updatedAt: new Date().toISOString() } : previous
+    )
+
+    updateConfig((draft) => ({
+      ...draft,
+      repository: { ...draft.repository, lastOpenedDocumentPath: document.path }
+    }))
+
+    if (document.isContentLoaded) return
+
+    if (binding?.activeSourceMode === 'mounted-vault' && binding.mountedVaultPath) {
       try {
-        const loaded = await fetchRemoteDocument(documentId, binding.libraryId)
-        setDocuments((previous) => previous.map((item) => item.id === documentId ? loaded : item))
+        const markdown = (await readMountedVaultTextFile(binding.mountedVaultPath, document.path)) ?? ''
+        const loaded: DocumentNode = {
+          ...document,
+          contentMd: markdown,
+          isContentLoaded: true,
+          contentVersion: hashString(markdown),
+          contentPlainText: markdownToPlainText(markdown),
+          updatedAt: new Date().toISOString()
+        }
+        setDocuments((previous) => previous.map((item) => item.id === loaded.id ? loaded : item))
+        if (documentLoadToken.current === loadToken) setCurrentDocument(loaded)
       } catch (loadError) {
         console.error(loadError)
       }
+      return
     }
-    setRepo({ ...repo, currentDocumentId: documentId, updatedAt: new Date().toISOString() })
-    if (document) {
-      updateConfig((draft) => ({
-        ...draft,
-        repository: { ...draft.repository, lastOpenedDocumentPath: document.path }
-      }))
+
+    if (binding?.activeSourceMode === 'remote-library' && binding.libraryId) {
+      try {
+        const loaded = await fetchRemoteDocument(document.id, binding.libraryId)
+        setDocuments((previous) => previous.map((item) => item.id === document.id ? loaded : item))
+        if (documentLoadToken.current === loadToken) setCurrentDocument(loaded)
+      } catch (loadError) {
+        console.error(loadError)
+      }
     }
   }
 
@@ -434,6 +483,7 @@ export function App() {
         }
       >
         <article
+          key={currentDocument.id}
           className="reader-body markdown-body"
           style={{ fontSize: config.rendering.readerFontPx }}
           onMouseUp={(event) => {
