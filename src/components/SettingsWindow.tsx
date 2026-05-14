@@ -149,9 +149,17 @@ export function SettingsWindow({
         </div>
       </div>
       <footer className="settings-footer">
-        <button className="settings-command primary" type="button" onClick={onSave}>
-          <Icon name="save" />
-          <span>保存</span>
+        <button className="settings-command" type="button" onClick={onClose}>
+          取消
+        </button>
+        <button className="settings-command" type="button" onClick={onSave}>
+          应用
+        </button>
+        <button className="settings-command primary" type="button" onClick={() => {
+          onSave()
+          onClose()
+        }}>
+          确定
         </button>
       </footer>
     </WindowFrame>
