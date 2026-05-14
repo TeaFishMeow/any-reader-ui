@@ -124,7 +124,7 @@
 .settings-body {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
-  height: calc(100% - 35px);
+  height: 100%;
   overflow: hidden;
 }
 
@@ -273,31 +273,4 @@
 .template-add:focus-visible {
   background: var(--hover);
   outline: none;
-}
-
-.settings-command {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  background: var(--title);
-  color: var(--text);
-}
-
-.settings-command.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #ffffff;
-}
-
-.settings-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  height: 35px;
-  padding: 3px 8px;
-  border-top: 1px solid var(--line);
-  background: var(--title);
 }

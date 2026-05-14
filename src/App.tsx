@@ -556,7 +556,6 @@ export function App() {
             frame={settingsFrame}
             onClose={() => setModal(null)}
             onChange={updateConfig}
-            onSave={() => void saveWorkspaceState({ config, canvas, version: workspaceVersion })}
             onResize={(handle, dx, dy) => setSettingsFrame((frame) => resizeFrame(handle, frame, dx, dy, 360, 260))}
           />
         </>

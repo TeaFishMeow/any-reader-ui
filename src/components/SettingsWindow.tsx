@@ -12,7 +12,6 @@ export function SettingsWindow({
   frame,
   onClose,
   onChange,
-  onSave,
   onResize
 }: {
   config: AppConfig
@@ -20,7 +19,6 @@ export function SettingsWindow({
   frame: ResizeFrame
   onClose: () => void
   onChange: (updater: (config: AppConfig) => AppConfig) => void
-  onSave: () => void
   onResize: (handle: ResizeHandle, dx: number, dy: number) => void
 }) {
   const templates = sortTemplates(config.templates)
@@ -148,20 +146,6 @@ export function SettingsWindow({
         </section>
         </div>
       </div>
-      <footer className="settings-footer">
-        <button className="settings-command" type="button" onClick={onClose}>
-          取消
-        </button>
-        <button className="settings-command" type="button" onClick={onSave}>
-          应用
-        </button>
-        <button className="settings-command primary" type="button" onClick={() => {
-          onSave()
-          onClose()
-        }}>
-          确定
-        </button>
-      </footer>
     </WindowFrame>
   )
 }
