@@ -11,7 +11,7 @@ export type IconName =
   | 'settings'
   | 'folder'
   | 'file'
-  | 'spark'
+  | 'star'
   | 'save'
   | 'keyboard'
   | 'plus'

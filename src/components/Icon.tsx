@@ -22,8 +22,8 @@ function iconPath(name: IconName) {
       return 'M2 4.5h4.25l1 1.5H14v6.5H2z'
     case 'file':
       return 'M4 2.5h5.25L12 5.25v8.25H4zM9.25 2.5v3h3'
-    case 'spark':
-      return 'M8 2.5 9.35 6.65 13.5 8l-4.15 1.35L8 13.5 6.65 9.35 2.5 8l4.15-1.35z'
+    case 'star':
+      return 'M8 2.5 9.2 6.8 13.5 8 9.2 9.2 8 13.5 6.8 9.2 2.5 8 6.8 6.8z'
     case 'save':
       return 'M3 2.5h8.5L13 4v9.5H3zM5 2.5v4h5v-4M5 13.5v-4h6v4'
     case 'keyboard':
@@ -36,6 +36,13 @@ function iconPath(name: IconName) {
 }
 
 export function Icon({ name }: { name: IconName }) {
+  if (name === 'star') {
+    return (
+      <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true" className="solid-icon">
+        <path d="M8 2.6c.28 0 .52.18.61.45l1.07 3.26 3.27 1.08a.64.64 0 0 1 0 1.22L9.68 9.69l-1.07 3.26a.64.64 0 0 1-1.22 0L6.31 9.69 3.05 8.61a.64.64 0 0 1 0-1.22l3.26-1.08 1.08-3.26A.64.64 0 0 1 8 2.6z" />
+      </svg>
+    )
+  }
   return (
     <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
       <path d={iconPath(name)} />

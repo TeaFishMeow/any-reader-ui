@@ -463,7 +463,7 @@ export function App() {
                 setFloatingMenu({ kind: 'model', x: rect.left, y: rect.top })
               }}
             >
-              <span aria-hidden="true">✦</span>
+              <Icon name="star" />
               <span>{creditSummary}</span>
             </button>
             <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
