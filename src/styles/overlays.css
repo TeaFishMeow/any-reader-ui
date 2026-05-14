@@ -29,7 +29,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
-  height: 24px;
 }
 
 .ask-menu button:hover,
@@ -51,21 +50,23 @@
 }
 
 .floating-menu {
-  width: 190px;
-  padding: 3px 0;
+  width: 170px;
+  padding: 1px 0;
+  font-size: 14px;
 }
 
-.floating-menu-heading,
-.floating-menu-empty,
-.floating-menu-subscription {
-  display: block;
-  padding: 5px 8px;
+.floating-menu button,
+.floating-menu-row {
+  min-height: 24px;
+  padding: 3px 7px;
 }
 
 .floating-menu-heading {
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid var(--line);
   color: #eeeeee;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .floating-menu button.is-active {
@@ -81,7 +82,9 @@
 }
 
 .floating-menu-subscription {
-  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
   border-top: 1px solid var(--line);
   color: var(--text);
   text-decoration: none;

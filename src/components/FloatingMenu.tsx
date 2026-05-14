@@ -36,7 +36,7 @@ export function FloatingMenu({
     <div ref={ref} className="floating-menu" style={selectionMenuPosition(state)}>
       {state.kind === 'model' ? (
         <>
-          <span className="floating-menu-heading">模型选择</span>
+          <div className="floating-menu-row floating-menu-heading">模型选择</div>
           {models.map((model) => (
             <button
               key={model.id}
@@ -48,7 +48,7 @@ export function FloatingMenu({
               <small>{model.cost}</small>
             </button>
           ))}
-          <a className="floating-menu-subscription" href="/subscription">管理订阅</a>
+          <a className="floating-menu-row floating-menu-subscription" href="/subscription">管理订阅</a>
         </>
       ) : (
         <button type="button" onClick={() => { onOpenSettings(); onClose() }}>
