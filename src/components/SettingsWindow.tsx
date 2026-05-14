@@ -44,11 +44,18 @@ export function SettingsWindow({
   }
   const dropTemplate = (event: DragEvent<HTMLDivElement>, targetId: string) => {
     event.preventDefault()
+    event.stopPropagation()
     const rect = event.currentTarget.getBoundingClientRect()
     const sourceId = event.dataTransfer.getData('text/plain') || draggingTemplateId
     if (sourceId) moveTemplate(sourceId, targetId, event.clientY > rect.top + rect.height / 2)
     setDraggingTemplateId(null)
     setDragTarget(null)
+  }
+  const dropTargetFromContent = (container: HTMLDivElement, y: number) => {
+    const rows = [...container.querySelectorAll<HTMLElement>('[data-template-id]')]
+    if (!rows.length) return null
+    const row = rows.find((item) => y < item.getBoundingClientRect().top + item.getBoundingClientRect().height / 2) ?? rows[rows.length - 1]
+    return { id: row.dataset.templateId ?? '', after: row === rows[rows.length - 1] && y >= row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2 }
   }
   return (
     <WindowFrame
@@ -71,7 +78,26 @@ export function SettingsWindow({
             </button>
           ))}
         </aside>
-        <div className="settings-content" ref={contentRef}>
+        <div
+          className="settings-content"
+          ref={contentRef}
+          onDragOver={(event) => {
+            if (!draggingTemplateId) return
+            const target = dropTargetFromContent(event.currentTarget, event.clientY)
+            if (!target) return
+            event.preventDefault()
+            setDragTarget(target)
+          }}
+          onDrop={(event) => {
+            if (!draggingTemplateId) return
+            const target = dropTargetFromContent(event.currentTarget, event.clientY)
+            if (!target) return
+            event.preventDefault()
+            moveTemplate(draggingTemplateId, target.id, target.after)
+            setDraggingTemplateId(null)
+            setDragTarget(null)
+          }}
+        >
         <section id="settings-shortcuts">
           <h2>快捷键</h2>
           {([
@@ -103,6 +129,7 @@ export function SettingsWindow({
               <div
                 className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}${dragTarget?.id === template.id ? (dragTarget.after ? ' is-drop-after' : ' is-drop-before') : ''}`}
                 key={template.id}
+                data-template-id={template.id}
                 draggable
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = 'move'
@@ -114,7 +141,12 @@ export function SettingsWindow({
                   setDragTarget(null)
                 }}
                 onDragOver={(event) => {
-                  if (!draggingTemplateId || draggingTemplateId === template.id) return
+                  event.stopPropagation()
+                  if (!draggingTemplateId) return
+                  if (draggingTemplateId === template.id) {
+                    setDragTarget(null)
+                    return
+                  }
                   event.preventDefault()
                   const rect = event.currentTarget.getBoundingClientRect()
                   setDragTarget({ id: template.id, after: event.clientY > rect.top + rect.height / 2 })
