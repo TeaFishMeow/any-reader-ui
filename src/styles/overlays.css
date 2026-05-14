@@ -189,7 +189,7 @@
 }
 
 .template-row {
-  grid-template-columns: 24px 28px 150px minmax(0, 1fr) 28px;
+  grid-template-columns: 24px 28px 28px 150px minmax(0, 1fr) 28px;
   cursor: grab;
 }
 
@@ -223,6 +223,25 @@
 .template-row > input[type='checkbox'] {
   width: 16px;
   justify-self: center;
+}
+
+.template-row > .template-color {
+  width: 22px;
+  height: 22px;
+  justify-self: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.template-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.template-color::-webkit-color-swatch,
+.template-color::-moz-color-swatch {
+  border-radius: 0;
 }
 
 .template-row.is-dragging {
