@@ -181,7 +181,7 @@
 .settings-body label,
 .template-row {
   display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
+  grid-template-columns: 110px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-height: 34px;
@@ -198,10 +198,11 @@
   font-size: 12px;
 }
 
-.settings-body input {
+.settings-body input,
+.settings-body select,
+.settings-body textarea {
   width: 100%;
   min-width: 0;
-  height: 26px;
   padding: 3px 7px;
   border: 1px solid var(--line);
   background: var(--panel-2);
@@ -209,9 +210,39 @@
   font-size: 15px;
 }
 
-.settings-body input:focus {
+.settings-body input,
+.settings-body select {
+  height: 26px;
+}
+
+.settings-body textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.settings-body input:focus,
+.settings-body select:focus,
+.settings-body textarea:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+.settings-body small {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.settings-textarea {
+  align-items: start;
+}
+
+.settings-textarea span {
+  padding-top: 6px;
+}
+
+.settings-textarea textarea {
+  grid-column: 2 / -1;
 }
 
 .template-list {

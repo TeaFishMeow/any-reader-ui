@@ -1,10 +1,20 @@
 import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
-import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
-import type { AppConfig, RepositoryBinding } from '../../src_original_reference/types/domain'
+import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
+import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
+
+const contextLabels: Record<ReadingContextMode, string> = {
+  paragraph: '当前段落',
+  section: '当前小节',
+  directory: '当前目录',
+  'viewport-range': '当前屏幕附近',
+  'manual-selection': '手动选区',
+  'widget-local': '当前窗口',
+  'sidebar-node': '左栏节点'
+}
 
 export function SettingsWindow({
   config,
@@ -27,6 +37,7 @@ export function SettingsWindow({
   const [dragTarget, setDragTarget] = useState<{ id: string; after: boolean } | null>(null)
   const sections = [
     ['settings-shortcuts', '快捷键'],
+    ['settings-context', '上下文'],
     ['settings-repository', 'Repository'],
     ['settings-templates', '提问选项']
   ] as const
@@ -108,6 +119,48 @@ export function SettingsWindow({
               <input value={config.shortcuts[key]} onChange={(event) => onChange((draft) => ({ ...draft, shortcuts: { ...draft.shortcuts, [key]: event.target.value.slice(-1).toLowerCase() || draft.shortcuts[key] } }))} />
             </label>
           ))}
+        </section>
+        <section id="settings-context">
+          <h2>上下文</h2>
+          <label>
+            <span>上下文模式</span>
+            <select
+              value={config.context.defaultMode}
+              onChange={(event) => onChange((draft) => ({
+                ...draft,
+                context: { ...draft.context, defaultMode: event.target.value as AppConfig['context']['defaultMode'] }
+              }))}
+            >
+              {allowedContextModesForNextAsk().map((mode) => (
+                <option key={mode} value={mode}>{contextLabels[mode]}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>视野块数</span>
+            <input
+              type="range"
+              min="1"
+              max="6"
+              value={config.context.viewportRangeBlocks}
+              onChange={(event) => onChange((draft) => ({
+                ...draft,
+                context: { ...draft.context, viewportRangeBlocks: Number(event.target.value) }
+              }))}
+            />
+            <small>{config.context.viewportRangeBlocks} 个块</small>
+          </label>
+          <label className="settings-textarea">
+            <span>学习提示</span>
+            <textarea
+              value={config.learning.prompt}
+              placeholder="描述助手应该优先遵循的学习目标或解释风格。"
+              onChange={(event) => onChange((draft) => ({
+                ...draft,
+                learning: { ...draft.learning, prompt: event.target.value }
+              }))}
+            />
+          </label>
         </section>
         <section id="settings-repository">
           <h2>Repository</h2>
