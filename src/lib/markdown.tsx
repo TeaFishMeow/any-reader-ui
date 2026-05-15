@@ -12,12 +12,9 @@ import { katexDelimiters, katexDisplayAttribute, katexOptions, katexSourceAttrib
 
 export interface MarkdownHighlight {
   id: string
-  text: string
   color: string
-  startOffset?: number
-  endOffset?: number
-  contextPrefix?: string
-  contextSuffix?: string
+  anchorFrom?: number
+  anchorTo?: number
 }
 
 export function titleForDocument(document: DocumentNode) {
@@ -54,8 +51,7 @@ const MarkdownHtml = memo(function MarkdownHtml({
 })
 
 function renderMarkdownHtml(markdown: string, documentPath?: string, highlights: MarkdownHighlight[] = []) {
-  const marked = markMarkdownSource(markdown, highlights)
-  const displayMarkdown = withFallbackTitle(marked.markdown, documentPath)
+  const marked = markMarkdownSource(withFallbackTitle(markdown, documentPath), highlights)
   const mathSlots: string[] = []
   let formulaIndex = 0
   const html = String(
@@ -76,7 +72,7 @@ function renderMarkdownHtml(markdown: string, documentPath?: string, highlights:
         }
       })
       .use(rehypeStringify)
-      .processSync(displayMarkdown)
+      .processSync(marked.markdown)
   )
 
   const resolvedHtml = mathSlots.reduce(
@@ -251,14 +247,15 @@ function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
   return { markdown: nextMarkdown, formulas, markers }
 }
 
-function sourceRangesForHighlight(markdown: string, map: { text: string; chars: MappedChar[] }, highlight: MarkdownHighlight) {
-  const fromPlain = plainRangeForHighlight(map.text, highlight)
-  const ranges = fromPlain ? sourceRangesFromPlain(map.chars, fromPlain.start, fromPlain.end, highlight) : []
-  if (!ranges.length) {
-    const direct = directSourceRange(markdown, highlight)
-    if (direct) ranges.push(direct)
-  }
-  return mergeSourceRanges(ranges)
+function sourceRangesForHighlight(_markdown: string, map: { text: string; chars: MappedChar[] }, highlight: MarkdownHighlight) {
+  const anchor = anchoredPlainRange(map.text, highlight)
+  return anchor ? mergeSourceRanges(sourceRangesFromPlain(map.chars, anchor.start, anchor.end, highlight)) : []
+}
+
+function anchoredPlainRange(plainText: string, highlight: MarkdownHighlight) {
+  if (typeof highlight.anchorFrom !== 'number' || typeof highlight.anchorTo !== 'number') return null
+  if (highlight.anchorFrom < 0 || highlight.anchorTo <= highlight.anchorFrom || highlight.anchorTo > plainText.length) return null
+  return { start: highlight.anchorFrom, end: highlight.anchorTo }
 }
 
 function sourceRangesFromPlain(chars: MappedChar[], start: number, end: number, highlight: MarkdownHighlight) {
@@ -274,54 +271,6 @@ function sourceRangesFromPlain(chars: MappedChar[], start: number, end: number, 
       else ranges.push({ id: highlight.id, color: highlight.color, start: source, end: source + 1 })
     })
   return ranges
-}
-
-function plainRangeForHighlight(plainText: string, highlight: MarkdownHighlight) {
-  const candidates = textCandidates(highlight.text)
-  if (!candidates.length) return null
-  if (
-    typeof highlight.startOffset === 'number' &&
-    typeof highlight.endOffset === 'number' &&
-    candidates.includes(plainText.slice(highlight.startOffset, highlight.endOffset).trim())
-  ) {
-    return { start: highlight.startOffset, end: highlight.endOffset }
-  }
-
-  for (const prefix of textCandidates(highlight.contextPrefix ?? '').map((text) => text.slice(-80))) {
-    const prefixIndex = plainText.indexOf(prefix)
-    const match = prefixIndex >= 0 ? candidateIndex(plainText, candidates, prefixIndex + prefix.length) : null
-    if (match) return { start: match.start, end: match.start + match.text.length }
-  }
-
-  for (const suffix of textCandidates(highlight.contextSuffix ?? '').map((text) => text.slice(0, 80))) {
-    const suffixIndex = plainText.indexOf(suffix)
-    const match = suffixIndex >= 0 ? candidateIndex(plainText, candidates, suffixIndex, true) : null
-    if (match) return { start: match.start, end: match.start + match.text.length }
-  }
-
-  const match = candidateIndex(plainText, candidates, 0)
-  return match ? { start: match.start, end: match.start + match.text.length } : null
-}
-
-function directSourceRange(markdown: string, highlight: MarkdownHighlight): SourceRange | null {
-  for (const text of textCandidates(highlight.text)) {
-    const start = markdown.indexOf(text)
-    if (start >= 0) return { id: highlight.id, color: highlight.color, start, end: start + text.length }
-  }
-  return null
-}
-
-function textCandidates(input: string) {
-  const normalized = normalizeSearchText(input)
-  return [...new Set([normalized, normalizeSearchText(markdownToPlainText(input))].filter(Boolean))]
-}
-
-function candidateIndex(text: string, candidates: string[], from: number, backwards = false) {
-  return candidates.reduce<{ start: number; text: string } | null>((best, candidate) => {
-    const start = backwards ? text.lastIndexOf(candidate, from) : text.indexOf(candidate, from)
-    const isBetter = backwards ? !best || start > best.start : !best || start < best.start
-    return start >= 0 && isBetter ? { start, text: candidate } : best
-  }, null)
 }
 
 function mergeSourceRanges(ranges: SourceRange[]) {
@@ -426,10 +375,6 @@ function formulaSearchText(latex: string, display: boolean) {
   return display ? `$$${normalized}$$` : `$${normalized}$`
 }
 
-function normalizeSearchText(input: string) {
-  return markdownSourceMap(input).text
-}
-
 function safeCssColor(color: string) {
   return /^#[\da-f]{3,8}$/i.test(color) ? color : '#569cd6'
 }
@@ -455,10 +400,8 @@ export function selectionAction(args: {
   if (selection.isCollapsed) return null
   const text = selectedTextWithKatexSource(selection)
   if (!text) return null
+  const anchor = selectionAnchor(selection)
   const content = args.surfaceText
-  const startOffset = content.indexOf(text)
-  const endOffset = startOffset >= 0 ? startOffset + text.length : undefined
-  const radius = 180
   return {
     surface: args.surface,
     target: args.target,
@@ -467,15 +410,41 @@ export function selectionAction(args: {
     selection: {
       text,
       kind: 'plain',
-      startOffset: startOffset >= 0 ? startOffset : undefined,
-      endOffset,
+      anchorFrom: anchor?.from,
+      anchorTo: anchor?.to,
       surfaceText: content,
-      contextPrefix: startOffset >= 0 ? content.slice(Math.max(0, startOffset - radius), startOffset) : undefined,
-      contextSuffix: endOffset !== undefined ? content.slice(endOffset, endOffset + radius) : undefined,
       anchorQuote: text
     },
     menuPoint: args.eventPoint
   }
+}
+
+function selectionAnchor(selection: Selection) {
+  if (selection.rangeCount === 0) return null
+  const range = selection.getRangeAt(0)
+  const commonElement =
+    range.commonAncestorContainer instanceof Element
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement
+  const root = commonElement?.closest('.markdown-body')
+  if (!root) return null
+  const math = commonElement?.closest(`[${katexSourceAttribute}]`)
+  const selectedRange = range.cloneRange()
+  if (math) selectedRange.selectNode(math)
+
+  const before = document.createRange()
+  before.setStart(root, 0)
+  before.setEnd(selectedRange.startContainer, selectedRange.startOffset)
+  const from = normalizedFragmentText(before.cloneContents()).length
+  const to = from + normalizedFragmentText(selectedRange.cloneContents()).length
+  return to > from ? { from, to } : null
+}
+
+function normalizedFragmentText(fragment: DocumentFragment) {
+  fragment.querySelectorAll(`[${katexSourceAttribute}]`).forEach((element) => {
+    element.textContent = katexSourceText(element)
+  })
+  return (fragment.textContent ?? '').replace(/\s+/g, '')
 }
 
 function selectedTextWithKatexSource(selection: Selection) {

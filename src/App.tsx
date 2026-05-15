@@ -50,12 +50,9 @@ import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
 function highlightForRecord(record: QARecord): MarkdownHighlight {
   return {
     id: record.id,
-    text: record.selectedText,
     color: record.visualStyle.color,
-    startOffset: record.anchor.startOffset,
-    endOffset: record.anchor.endOffset,
-    contextPrefix: record.anchor.contextPrefix,
-    contextSuffix: record.anchor.contextSuffix
+    anchorFrom: record.anchor.anchorFrom,
+    anchorTo: record.anchor.anchorTo
   }
 }
 
