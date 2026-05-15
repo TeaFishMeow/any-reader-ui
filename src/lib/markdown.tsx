@@ -428,9 +428,11 @@ function selectionAnchor(selection: Selection) {
       : range.commonAncestorContainer.parentElement
   const root = commonElement?.closest('.markdown-body')
   if (!root) return null
-  const math = commonElement?.closest(`[${katexSourceAttribute}]`)
   const selectedRange = range.cloneRange()
-  if (math) selectedRange.selectNode(math)
+  const startMath = closestMathElement(selectedRange.startContainer)
+  const endMath = closestMathElement(selectedRange.endContainer)
+  if (startMath) selectedRange.setStartBefore(startMath)
+  if (endMath) selectedRange.setEndAfter(endMath)
 
   const before = document.createRange()
   before.setStart(root, 0)
@@ -438,6 +440,11 @@ function selectionAnchor(selection: Selection) {
   const from = normalizedFragmentText(before.cloneContents()).length
   const to = from + normalizedFragmentText(selectedRange.cloneContents()).length
   return to > from ? { from, to } : null
+}
+
+function closestMathElement(node: Node) {
+  const element = node instanceof Element ? node : node.parentElement
+  return element?.closest(`[${katexSourceAttribute}]`) ?? null
 }
 
 function normalizedFragmentText(fragment: DocumentFragment) {
