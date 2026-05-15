@@ -133,6 +133,6 @@
   overflow: auto;
   padding: 28px 52px 72px;
   background: var(--panel-2);
-  color: #d4d4d4;
+  color: var(--content-text);
   line-height: 1.76;
 }

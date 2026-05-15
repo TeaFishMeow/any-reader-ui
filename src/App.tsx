@@ -45,6 +45,7 @@ import {
 } from './constants'
 import { isAbortError } from './lib/errors'
 import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
+import { applyTheme, themeMode } from './lib/theme'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
 
 function highlightForRecord(record: QARecord): MarkdownHighlight {
@@ -188,6 +189,11 @@ export function App() {
       activeRuns.current.forEach((controller) => controller.abort())
     }
   }, [])
+
+  useEffect(() => {
+    if (!config) return
+    applyTheme(themeMode(config))
+  }, [config])
 
   useEffect(() => {
     if (!config) return

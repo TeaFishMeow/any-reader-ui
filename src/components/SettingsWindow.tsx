@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
+import { setThemeMode, themeMode, type ThemeMode } from '../lib/theme'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -36,6 +37,7 @@ export function SettingsWindow({
   const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null)
   const [dragTarget, setDragTarget] = useState<{ id: string; after: boolean } | null>(null)
   const sections = [
+    ['settings-theme', '主题'],
     ['settings-shortcuts', '快捷键'],
     ['settings-context', '上下文'],
     ['settings-repository', 'Repository'],
@@ -107,6 +109,19 @@ export function SettingsWindow({
             setDragTarget(null)
           }}
         >
+        <section id="settings-theme">
+          <h2>主题</h2>
+          <label>
+            <span>颜色模式</span>
+            <select
+              value={themeMode(config)}
+              onChange={(event) => onChange((draft) => setThemeMode(draft, event.target.value as ThemeMode))}
+            >
+              <option value="light">浅色模式</option>
+              <option value="dark">深色模式</option>
+            </select>
+          </label>
+        </section>
         <section id="settings-shortcuts">
           <h2>快捷键</h2>
           {([

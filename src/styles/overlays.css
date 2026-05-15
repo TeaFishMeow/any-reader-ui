@@ -72,7 +72,7 @@
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  color: #eeeeee;
+  color: var(--heading);
   font-weight: 400;
 }
 
@@ -173,7 +173,7 @@
   margin: 0 0 10px;
   padding-bottom: 7px;
   border-bottom: 1px solid var(--line);
-  color: #eeeeee;
+  color: var(--heading);
   font-size: 13px;
 }
 
@@ -316,8 +316,8 @@
 
 .template-delete:hover,
 .template-delete:focus-visible {
-  background: #5a1d1d;
-  color: #ffffff;
+  background: var(--danger-hover);
+  color: var(--danger-text);
   outline: none;
 }
 

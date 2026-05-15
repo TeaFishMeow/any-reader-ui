@@ -38,7 +38,7 @@
   min-width: 0;
   padding: 0 12px;
   overflow: hidden;
-  color: #dddddd;
+  color: var(--heading);
   font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -179,8 +179,8 @@
 }
 
 .icon-button.danger:hover {
-  background: #5a1d1d;
-  color: #ffffff;
+  background: var(--danger-hover);
+  color: var(--danger-text);
 }
 
 .logo {
