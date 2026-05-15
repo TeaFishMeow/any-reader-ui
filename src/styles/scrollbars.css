@@ -8,8 +8,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--muted);
+  background: color-mix(in srgb, var(--line) 90%, var(--text));
   border: 2px solid var(--canvas);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--line) 80%, var(--text));
 }
 
 @media (max-width: 860px) {
