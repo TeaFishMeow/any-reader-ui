@@ -1,6 +1,6 @@
 import type { AppConfig } from '../../src_original_reference/types/domain'
 
-export type ThemeMode = 'light' | 'dark'
+export type ThemeMode = 'system' | 'light' | 'dark'
 export type ThemeStyle = 'default' | 'reading'
 
 type ConfigWithTheme = AppConfig & {
@@ -11,7 +11,8 @@ type ConfigWithTheme = AppConfig & {
 }
 
 export function themeMode(config: AppConfig | null): ThemeMode {
-  return (config as ConfigWithTheme | null)?.theme?.mode === 'light' ? 'light' : 'dark'
+  const mode = (config as ConfigWithTheme | null)?.theme?.mode
+  return mode === 'light' || mode === 'dark' ? mode : 'system'
 }
 
 export function setThemeMode(config: AppConfig, mode: ThemeMode): AppConfig {
@@ -19,7 +20,7 @@ export function setThemeMode(config: AppConfig, mode: ThemeMode): AppConfig {
 }
 
 export function themeStyle(config: AppConfig | null): ThemeStyle {
-  return (config as ConfigWithTheme | null)?.theme?.style === 'reading' ? 'reading' : 'default'
+  return (config as ConfigWithTheme | null)?.theme?.style === 'default' ? 'default' : 'reading'
 }
 
 export function setThemeStyle(config: AppConfig, style: ThemeStyle): AppConfig {
@@ -29,5 +30,5 @@ export function setThemeStyle(config: AppConfig, style: ThemeStyle): AppConfig {
 export function applyTheme(mode: ThemeMode, style: ThemeStyle) {
   document.documentElement.dataset.theme = mode
   document.documentElement.dataset.themeStyle = style
-  document.documentElement.style.colorScheme = mode
+  document.documentElement.style.colorScheme = mode === 'system' ? 'light dark' : mode
 }

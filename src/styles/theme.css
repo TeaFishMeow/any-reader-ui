@@ -41,3 +41,39 @@
   --muted: #87919d;
   --accent: #8aa6c8;
 }
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    color-scheme: light;
+    --canvas: #f3f3f3;
+    --panel: #f3f3f3;
+    --panel-2: #ffffff;
+    --line: #d0d0d0;
+    --text: #1f1f1f;
+    --muted: #616161;
+    --accent: #007acc;
+    --danger: #c42b1c;
+  }
+
+  :root[data-theme='system'][data-theme-style='reading'] {
+    --canvas: #efe6d2;
+    --panel: #fbf4e6;
+    --panel-2: #fff8ea;
+    --line: #d8c7a6;
+    --text: #2c2418;
+    --muted: #7b6b52;
+    --accent: #8a5a1f;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'][data-theme-style='reading'] {
+    --canvas: #080d14;
+    --panel: #0d131c;
+    --panel-2: #0a1018;
+    --line: #202a36;
+    --text: #d2d8df;
+    --muted: #87919d;
+    --accent: #8aa6c8;
+  }
+}

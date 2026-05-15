@@ -117,6 +117,7 @@ export function SettingsWindow({
               value={themeMode(config)}
               onChange={(event) => onChange((draft) => setThemeMode(draft, event.target.value as ThemeMode))}
             >
+              <option value="system">跟随系统</option>
               <option value="light">浅色模式</option>
               <option value="dark">深色模式</option>
             </select>
@@ -127,8 +128,8 @@ export function SettingsWindow({
               value={themeStyle(config)}
               onChange={(event) => onChange((draft) => setThemeStyle(draft, event.target.value as ThemeStyle))}
             >
-              <option value="default">当前风格</option>
-              <option value="reading">读书风格</option>
+              <option value="reading">阅读风格</option>
+              <option value="default">现代风格</option>
             </select>
           </label>
         </section>
