@@ -28,7 +28,7 @@ export function themeStyle(): ThemeStyle {
 
 export function themeEnglishFont(): EnglishFont {
   const font = localStorage.getItem(themeEnglishFontKey)
-  return isEnglishFont(font) ? font : 'georgia'
+  return isEnglishFont(font) ? font : 'palatino'
 }
 
 export function themeChineseFont(): ChineseFont {
