@@ -1,19 +1,19 @@
 .markdown-body h1 {
   margin: 0 0 18px;
-  color: var(--heading-strong);
+  color: var(--text);
   font-size: 26px;
   line-height: 1.3;
 }
 
 .markdown-body h2 {
   margin: 26px 0 12px;
-  color: var(--heading);
+  color: var(--text);
   font-size: 20px;
 }
 
 .markdown-body h3 {
   margin: 20px 0 10px;
-  color: var(--heading);
+  color: var(--text);
   font-size: 16px;
 }
 
@@ -21,7 +21,7 @@
 .markdown-body h5,
 .markdown-body h6 {
   margin: 18px 0 8px;
-  color: var(--heading);
+  color: var(--text);
   font-size: 14px;
 }
 
@@ -43,7 +43,7 @@
   margin: 0 0 1em;
   padding-left: 14px;
   border-left: 3px solid var(--line);
-  color: var(--blockquote-text);
+  color: var(--muted);
 }
 
 .markdown-body hr {
@@ -56,7 +56,7 @@
 .markdown-body code {
   padding: 1px 4px;
   border-radius: 3px;
-  background: var(--code-bg);
+  background: var(--panel);
   font-family: Consolas, "SFMono-Regular", monospace;
 }
 
@@ -64,7 +64,7 @@
   overflow: auto;
   margin: 0 0 1em;
   padding: 10px 12px;
-  background: var(--pre-bg);
+  background: var(--panel);
 }
 
 .markdown-body pre code {
@@ -85,12 +85,12 @@
 }
 
 .markdown-body th {
-  background: var(--code-bg);
+  background: var(--panel);
   font-weight: 600;
 }
 
 .markdown-body a {
-  color: var(--link);
+  color: var(--accent);
 }
 
 .markdown-body img {
@@ -111,7 +111,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   margin: 14px 0;
-  color: var(--heading);
+  color: var(--text);
 }
 
 .math-block.qa-source-highlight {
@@ -124,7 +124,7 @@
 }
 
 .math-inline {
-  color: var(--heading);
+  color: var(--text);
 }
 
 .katex svg {
@@ -161,7 +161,7 @@
 }
 
 .qa-window {
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .qa-inner {
@@ -194,7 +194,7 @@
   display: grid;
   gap: 10px;
   padding: 10px;
-  background: var(--detail-bg);
+  background: var(--panel-2);
 }
 
 .detail-body span {
@@ -210,7 +210,7 @@
   margin-bottom: 12px;
   padding: 8px 10px;
   border-left: 2px solid var(--accent);
-  background: var(--question-bg);
+  background: var(--panel-2);
   font-weight: 600;
 }
 

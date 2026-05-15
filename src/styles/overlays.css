@@ -4,7 +4,7 @@
   z-index: 100;
   border: 1px solid var(--line);
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .modal-backdrop {
@@ -43,7 +43,7 @@
 .ask-menu button.is-hovered,
 .floating-menu button:hover,
 .floating-menu button:focus-visible {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   outline: none;
 }
 
@@ -72,12 +72,12 @@
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  color: var(--heading);
+  color: var(--text);
   font-weight: 400;
 }
 
 .floating-menu button.is-active {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .floating-menu button small {
@@ -99,7 +99,7 @@
 
 .floating-menu-subscription:hover,
 .floating-menu-subscription:focus-visible {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   outline: none;
 }
 
@@ -118,7 +118,7 @@
   height: min(700px, calc(100vh - 112px));
   z-index: 120;
   transform: translateX(-50%);
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .settings-body {
@@ -147,7 +147,7 @@
 
 .settings-nav button:hover,
 .settings-nav button:focus-visible {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }
 
@@ -173,7 +173,7 @@
   margin: 0 0 10px;
   padding-bottom: 7px;
   border-bottom: 1px solid var(--line);
-  color: var(--heading);
+  color: var(--text);
   font-size: 13px;
 }
 
@@ -316,13 +316,13 @@
 
 .template-delete:hover,
 .template-delete:focus-visible {
-  background: var(--danger-hover);
-  color: var(--danger-text);
+  background: var(--danger);
+  color: var(--panel-2);
   outline: none;
 }
 
 .template-add:hover,
 .template-add:focus-visible {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }

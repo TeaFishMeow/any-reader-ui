@@ -29,7 +29,7 @@
   min-width: 0;
   height: 35px;
   border-bottom: 1px solid var(--line);
-  background: var(--title);
+  background: var(--panel);
   user-select: none;
 }
 
@@ -38,7 +38,7 @@
   min-width: 0;
   padding: 0 12px;
   overflow: hidden;
-  color: var(--heading);
+  color: var(--text);
   font-size: 12px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -71,7 +71,7 @@
 
 .window-collapsed-blank:hover,
 .window-collapsed-blank:focus-visible {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }
 
@@ -174,13 +174,13 @@
 .icon-button:hover,
 .icon-button:focus-visible,
 .icon-button.is-active {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }
 
 .icon-button.danger:hover {
-  background: var(--danger-hover);
-  color: var(--danger-text);
+  background: var(--danger);
+  color: var(--panel-2);
 }
 
 .logo {

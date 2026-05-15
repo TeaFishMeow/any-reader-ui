@@ -4,12 +4,12 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--scroll-track);
+  background: var(--canvas);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb);
-  border: 2px solid var(--scroll-track);
+  background: var(--muted);
+  border: 2px solid var(--canvas);
 }
 
 @media (max-width: 860px) {

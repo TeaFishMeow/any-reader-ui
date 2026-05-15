@@ -77,7 +77,7 @@
 .tree-item:hover,
 .tree-item:focus-visible,
 .tree-item.is-active {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }
 
@@ -85,7 +85,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
   border-top: 1px solid var(--line);
-  background: var(--title);
+  background: var(--panel);
 }
 
 .directory-footer button {
@@ -110,7 +110,7 @@
 
 .directory-footer button:hover,
 .directory-footer button:focus-visible {
-  background: var(--hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
 }
 
@@ -133,6 +133,6 @@
   overflow: auto;
   padding: 28px 52px 72px;
   background: var(--panel-2);
-  color: var(--content-text);
+  color: var(--text);
   line-height: 1.76;
 }
