@@ -2,7 +2,22 @@ import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
-import { setThemeMode, setThemeStyle, themeMode, themeStyle, type ThemeMode, type ThemeStyle } from '../lib/theme'
+import {
+  chineseFontOptions,
+  englishFontOptions,
+  setThemeChineseFont,
+  setThemeEnglishFont,
+  setThemeMode,
+  setThemeStyle,
+  themeChineseFont,
+  themeEnglishFont,
+  themeMode,
+  themeStyle,
+  type ChineseFont,
+  type EnglishFont,
+  type ThemeMode,
+  type ThemeStyle
+} from '../lib/theme'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -130,6 +145,28 @@ export function SettingsWindow({
             >
               <option value="reading">阅读风格</option>
               <option value="default">现代风格</option>
+            </select>
+          </label>
+          <label>
+            <span>英文字体</span>
+            <select
+              value={themeEnglishFont()}
+              onChange={(event) => onChange((draft) => setThemeEnglishFont(draft, event.target.value as EnglishFont))}
+            >
+              {englishFontOptions.map((font) => (
+                <option key={font.value} value={font.value}>{font.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>中文字体</span>
+            <select
+              value={themeChineseFont()}
+              onChange={(event) => onChange((draft) => setThemeChineseFont(draft, event.target.value as ChineseFont))}
+            >
+              {chineseFontOptions.map((font) => (
+                <option key={font.value} value={font.value}>{font.label}</option>
+              ))}
             </select>
           </label>
         </section>
