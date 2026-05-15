@@ -58,6 +58,11 @@ function highlightForRecord(record: QARecord): MarkdownHighlight {
 }
 
 const EMPTY_HIGHLIGHTS: MarkdownHighlight[] = []
+type ZoomTarget = 'directory' | 'reader' | 'widget'
+
+function fontZoom(value: number, delta: number) {
+  return Math.max(10, Math.min(32, value + delta))
+}
 
 export function App() {
   const [loading, setLoading] = useState(true)
@@ -75,6 +80,8 @@ export function App() {
   const [floatingMenu, setFloatingMenu] = useState<MenuState | null>(null)
   const [modal, setModal] = useState<ModalName>(null)
   const [readerMaximized, setReaderMaximized] = useState(false)
+  const [zoomTarget, setZoomTarget] = useState<ZoomTarget>('reader')
+  const [directoryFontPx, setDirectoryFontPx] = useState(13)
   const [directoryFrame, setDirectoryFrame] = useState<ResizeFrame>({ x: 0, y: 0, w: LEFT_DEFAULT, h: VIEWPORT_HEIGHT() })
   const [readerFrame, setReaderFrame] = useState<ResizeFrame>({ x: LEFT_DEFAULT, y: 0, w: READER_WIDTH, h: VIEWPORT_HEIGHT() })
   const [settingsFrame, setSettingsFrame] = useState<ResizeFrame>(() => ({
@@ -198,9 +205,27 @@ export function App() {
   useEffect(() => {
     if (!config) return
     const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && ['+', '=', '-', '_', '0'].includes(key)) {
+        event.preventDefault()
+        const delta = key === '0' ? 0 : key === '-' || key === '_' ? -1 : 1
+        if (zoomTarget === 'directory') {
+          setDirectoryFontPx((value) => key === '0' ? 13 : fontZoom(value, delta))
+        } else {
+          updateConfig((draft) => ({
+            ...draft,
+            rendering: {
+              ...draft.rendering,
+              [zoomTarget === 'widget' ? 'widgetFontPx' : 'readerFontPx']: key === '0'
+                ? 16
+                : fontZoom(draft.rendering[zoomTarget === 'widget' ? 'widgetFontPx' : 'readerFontPx'], delta)
+            }
+          }))
+        }
+        return
+      }
       const target = event.target as HTMLElement | null
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
-      const key = event.key.toLowerCase()
       if (key === config.shortcuts.toggleLeft) {
         event.preventDefault()
         updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))
@@ -218,7 +243,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [config])
+  }, [config, zoomTarget])
 
   async function openDocument(documentId: string) {
     if (!repo || !config) return
@@ -474,10 +499,13 @@ export function App() {
               highlights={record ? widgetHighlights.get(record.id) ?? EMPTY_HIGHLIGHTS : EMPTY_HIGHLIGHTS}
               documents={documents}
               config={config}
-              onFocus={() => updateCanvas((draft) => {
-                const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
-                return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
-              })}
+              onFocus={() => {
+                setZoomTarget('widget')
+                updateCanvas((draft) => {
+                  const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
+                  return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
+                })
+              }}
               onFrameChange={(frame) => updateCanvas((draft) => ({
                 ...draft,
                 widgetStates: draft.widgetStates.map((item) =>
@@ -501,6 +529,7 @@ export function App() {
         collapsed={config.layout.leftSidebarCollapsed}
         title={<Logo />}
         style={{ left: 0, top: directoryFrame.y, width: leftWidth, height: '100vh', zIndex: 20 }}
+        onMouseDown={() => setZoomTarget('directory')}
         resizeHandles={['e']}
         resizeWhenCollapsed
         onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: false } }))}
@@ -532,7 +561,7 @@ export function App() {
           </>
         }
       >
-        <div className="directory-body">
+        <div className="directory-body" style={{ fontSize: directoryFontPx }}>
           <Sidebar
             repo={repo}
             nodes={nodes}
@@ -554,6 +583,7 @@ export function App() {
         collapsed={config.layout.rightSidebarCollapsed}
         title={<span>{readerTitle}</span>}
         style={{ left: readerLeft, top: readerFrame.y, width: readerWidth, height: '100vh', zIndex: 18 }}
+        onMouseDown={() => setZoomTarget('reader')}
         resizeHandles={['e']}
         resizeWhenCollapsed
         onCollapsedBlankClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: false } }))}

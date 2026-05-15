@@ -36,7 +36,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: small;
+  font-size: inherit;
 }
 
 .tree-list {
@@ -50,11 +50,11 @@
   gap: 6px;
   width: 100%;
   min-width: 0;
-  height: 24px;
   border: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
+  margin: 4px 0;
 }
 
 .tree-item span {
