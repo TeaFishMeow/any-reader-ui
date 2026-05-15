@@ -114,7 +114,7 @@ export function SettingsWindow({
           <label>
             <span>颜色模式</span>
             <select
-              value={themeMode(config)}
+              value={themeMode()}
               onChange={(event) => onChange((draft) => setThemeMode(draft, event.target.value as ThemeMode))}
             >
               <option value="system">跟随系统</option>
@@ -125,7 +125,7 @@ export function SettingsWindow({
           <label>
             <span>主题风格</span>
             <select
-              value={themeStyle(config)}
+              value={themeStyle()}
               onChange={(event) => onChange((draft) => setThemeStyle(draft, event.target.value as ThemeStyle))}
             >
               <option value="reading">阅读风格</option>

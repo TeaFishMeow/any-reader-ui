@@ -3,28 +3,26 @@ import type { AppConfig } from '../../src_original_reference/types/domain'
 export type ThemeMode = 'system' | 'light' | 'dark'
 export type ThemeStyle = 'default' | 'reading'
 
-type ConfigWithTheme = AppConfig & {
-  theme?: {
-    mode?: ThemeMode
-    style?: ThemeStyle
-  }
+const themeModeKey = 'anyreader.theme.mode'
+const themeStyleKey = 'anyreader.theme.style'
+
+export function themeMode(): ThemeMode {
+  const mode = localStorage.getItem(themeModeKey)
+  return mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'system'
 }
 
-export function themeMode(config: AppConfig | null): ThemeMode {
-  const mode = (config as ConfigWithTheme | null)?.theme?.mode
-  return mode === 'light' || mode === 'dark' ? mode : 'system'
+export function themeStyle(): ThemeStyle {
+  return localStorage.getItem(themeStyleKey) === 'default' ? 'default' : 'reading'
 }
 
 export function setThemeMode(config: AppConfig, mode: ThemeMode): AppConfig {
-  return { ...config, theme: { ...(config as ConfigWithTheme).theme, mode } } as AppConfig
-}
-
-export function themeStyle(config: AppConfig | null): ThemeStyle {
-  return (config as ConfigWithTheme | null)?.theme?.style === 'default' ? 'default' : 'reading'
+  localStorage.setItem(themeModeKey, mode)
+  return { ...config }
 }
 
 export function setThemeStyle(config: AppConfig, style: ThemeStyle): AppConfig {
-  return { ...config, theme: { ...(config as ConfigWithTheme).theme, style } } as AppConfig
+  localStorage.setItem(themeStyleKey, style)
+  return { ...config }
 }
 
 export function applyTheme(mode: ThemeMode, style: ThemeStyle) {

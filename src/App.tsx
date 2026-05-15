@@ -192,7 +192,7 @@ export function App() {
 
   useEffect(() => {
     if (!config) return
-    applyTheme(themeMode(config), themeStyle(config))
+    applyTheme(themeMode(), themeStyle())
   }, [config])
 
   useEffect(() => {
