@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
-import { setThemeMode, themeMode, type ThemeMode } from '../lib/theme'
+import { setThemeMode, setThemeStyle, themeMode, themeStyle, type ThemeMode, type ThemeStyle } from '../lib/theme'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -119,6 +119,16 @@ export function SettingsWindow({
             >
               <option value="light">浅色模式</option>
               <option value="dark">深色模式</option>
+            </select>
+          </label>
+          <label>
+            <span>主题风格</span>
+            <select
+              value={themeStyle(config)}
+              onChange={(event) => onChange((draft) => setThemeStyle(draft, event.target.value as ThemeStyle))}
+            >
+              <option value="default">当前风格</option>
+              <option value="reading">读书风格</option>
             </select>
           </label>
         </section>
