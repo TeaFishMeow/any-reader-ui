@@ -3,8 +3,6 @@ import { createId } from '../../src_original_reference/lib/text'
 import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
 import {
-  chineseFontOptions,
-  englishFontOptions,
   setThemeChineseFont,
   setThemeEnglishFont,
   setThemeMode,
@@ -18,6 +16,7 @@ import {
   type ThemeMode,
   type ThemeStyle
 } from '../lib/theme'
+import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
