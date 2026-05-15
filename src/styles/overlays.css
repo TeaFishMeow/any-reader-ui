@@ -133,7 +133,6 @@
   align-content: start;
   gap: 2px;
   padding: 10px;
-  border-right: 1px solid var(--line);
   background: var(--panel-2);
 }
 
@@ -185,7 +184,6 @@
   align-items: center;
   gap: 10px;
   min-height: 34px;
-  border-bottom: 1px solid var(--line-soft);
 }
 
 .template-row {
