@@ -218,10 +218,19 @@ function escapeHtmlAttribute(input: string) {
 type MappedChar = { ch: string; source: number }
 type SourceRange = { id: string; color: string; start: number; end: number }
 type FormulaRange = { start: number; end: number; id?: string; color?: string }
+type MarkdownNode = {
+  type: string
+  value?: string
+  children?: MarkdownNode[]
+  position?: {
+    start?: { offset?: number }
+    end?: { offset?: number }
+  }
+}
 
 function markMarkdownSource(markdown: string, highlights: MarkdownHighlight[]) {
-  const map = plainMapForMarkdown(markdown)
-  const formulas = mathSourceRanges(markdown)
+  const map = markdownSourceMap(markdown)
+  const formulas = map.formulas
   if (!highlights.length) return { markdown, formulas, markers: [] as Array<SourceRange & { startToken: string; endToken: string }> }
   const textRanges = highlights
     .flatMap((highlight) => sourceRangesForHighlight(markdown, map, highlight))
@@ -346,86 +355,79 @@ function trimRange(markdown: string, range: SourceRange) {
   return range
 }
 
-function mathSourceRanges(markdown: string) {
-  const ranges: FormulaRange[] = []
-  for (const delimiter of katexDelimiters) {
-    let start = markdown.indexOf(delimiter.left)
-    while (start >= 0) {
-      if (isEscaped(markdown, start) || isDoubleDollar(markdown, start, delimiter.left)) {
-        start = markdown.indexOf(delimiter.left, start + delimiter.left.length)
-        continue
-      }
-      const contentStart = start + delimiter.left.length
-      const end = findClosingDelimiter(markdown, contentStart, delimiter.right)
-      if (end < 0) break
-      ranges.push({ start, end: end + delimiter.right.length })
-      start = markdown.indexOf(delimiter.left, end + delimiter.right.length)
-    }
-  }
-  return ranges.sort((left, right) => left.start - right.start)
-}
-
-function plainMapForMarkdown(markdown: string) {
-  let chars = formulaMappedChars(markdown)
-  chars = replaceMapped(chars, /```[\s\S]*?```/g, (match) => [{ ch: ' ', source: match.index }])
-  chars = replaceMapped(chars, /`([^`]+)`/g, (match) => groupChars(chars, match, 1))
-  chars = replaceMapped(chars, /!\[[^\]]*]\([^)]*\)/g, (match) => [{ ch: ' ', source: match.index }])
-  chars = replaceMapped(chars, /\[([^\]]+)]\([^)]*\)/g, (match) => groupChars(chars, match, 1))
-  chars = replaceMapped(chars, /^>\s?/gm, () => [])
-  chars = replaceMapped(chars, /^#{1,6}\s+/gm, () => [])
-  chars = replaceMapped(chars, /[*_~]/g, () => [])
-  chars = replaceMapped(chars, /^\s*[-+]\s+/gm, () => [])
-  chars = replaceMapped(chars, /^\s*\d+\.\s+/gm, () => [])
-  chars = replaceMapped(chars, /\n{3,}/g, (match) => [
-    { ch: '\n', source: match.index },
-    { ch: '\n', source: match.index + 1 }
-  ])
-  chars = chars.filter((item) => !/\s/.test(item.ch))
-  return { text: chars.map((item) => item.ch).join(''), chars }
-}
-
-function formulaMappedChars(markdown: string) {
-  const formulas = mathSourceRanges(markdown)
+function markdownSourceMap(markdown: string) {
   const chars: MappedChar[] = []
-  let cursor = 0
-  formulas.forEach((formula) => {
-    chars.push(...[...markdown.slice(cursor, formula.start)].map((ch, index) => ({ ch, source: cursor + index })))
-    chars.push(...[...formulaSearchText(markdown.slice(formula.start, formula.end))].map((ch) => ({ ch, source: formula.start })))
-    cursor = formula.end
+  const formulas: FormulaRange[] = []
+  walkMarkdown(unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(markdown) as MarkdownNode, (node) => {
+    if (node.type === 'text' || node.type === 'inlineCode') chars.push(...mappedNodeValue(markdown, node))
+    if (node.type === 'code') chars.push(...mappedCodeValue(markdown, node))
+    if (node.type === 'math' || node.type === 'inlineMath') {
+      const range = nodeRange(node)
+      if (!range) return
+      formulas.push(range)
+      chars.push(...[...formulaSearchText(node.value ?? '', node.type === 'math')].map((ch) => ({ ch, source: range.start })))
+    }
   })
-  chars.push(...[...markdown.slice(cursor)].map((ch, index) => ({ ch, source: cursor + index })))
-  return chars
+  const visibleChars = chars.filter((item) => !/\s/.test(item.ch))
+  return { text: visibleChars.map((item) => item.ch).join(''), chars: visibleChars, formulas }
 }
 
-function formulaSearchText(source: string) {
-  const delimiter = katexDelimiters.find((item) => source.startsWith(item.left) && source.endsWith(item.right))
-  if (!delimiter) return source
-  const latex = source.slice(delimiter.left.length, source.length - delimiter.right.length).trim()
-  return delimiter.display ? `$$${latex}$$` : `$${latex}$`
+function walkMarkdown(node: MarkdownNode, visit: (node: MarkdownNode) => void) {
+  visit(node)
+  node.children?.forEach((child) => walkMarkdown(child, visit))
+}
+
+function nodeRange(node: MarkdownNode): FormulaRange | null {
+  const start = node.position?.start?.offset
+  const end = node.position?.end?.offset
+  return typeof start === 'number' && typeof end === 'number' ? { start, end } : null
+}
+
+function mappedNodeValue(markdown: string, node: MarkdownNode) {
+  const value = node.value ?? ''
+  const range = nodeRange(node)
+  if (!range || !value) return []
+  return mappedValueInChars(value, [...markdown.slice(range.start, range.end)].map((ch, index) => ({ ch, source: range.start + index })))
+}
+
+function mappedCodeValue(markdown: string, node: MarkdownNode) {
+  const value = node.value ?? ''
+  const range = nodeRange(node)
+  if (!range || !value) return []
+  const chars: MappedChar[] = []
+  let offset = range.start
+  for (const line of markdown.slice(range.start, range.end).match(/[^\n]*(?:\n|$)/g) ?? []) {
+    if (!line) continue
+    const quotePrefix = line.match(/^[ \t]*>\s?/)?.[0] ?? ''
+    const body = line.slice(quotePrefix.length)
+    const fence = body.trimStart().startsWith('```') || body.trimStart().startsWith('~~~')
+    if (!fence) {
+      chars.push(...[...body].map((ch, index) => ({ ch, source: offset + quotePrefix.length + index })))
+    }
+    offset += line.length
+  }
+  return mappedValueInChars(value, chars)
+}
+
+function mappedValueInChars(value: string, chars: MappedChar[]) {
+  const mapped: MappedChar[] = []
+  let cursor = 0
+  for (const ch of value) {
+    const index = chars.findIndex((item, itemIndex) => itemIndex >= cursor && item.ch === ch)
+    if (index < 0) continue
+    mapped.push(chars[index])
+    cursor = index + 1
+  }
+  return mapped
+}
+
+function formulaSearchText(latex: string, display: boolean) {
+  const normalized = latex.trim()
+  return display ? `$$${normalized}$$` : `$${normalized}$`
 }
 
 function normalizeSearchText(input: string) {
-  return formulaMappedChars(input).map((item) => item.ch).join('').replace(/\s+/g, '').trim()
-}
-
-function replaceMapped(chars: MappedChar[], regex: RegExp, replacement: (match: RegExpExecArray) => MappedChar[]) {
-  const text = chars.map((item) => item.ch).join('')
-  const next: MappedChar[] = []
-  let cursor = 0
-  for (const match of text.matchAll(regex)) {
-    next.push(...chars.slice(cursor, match.index))
-    next.push(...replacement(match))
-    cursor = (match.index ?? 0) + match[0].length
-  }
-  next.push(...chars.slice(cursor))
-  return next
-}
-
-function groupChars(chars: MappedChar[], match: RegExpExecArray, groupIndex: number) {
-  const value = match[groupIndex] ?? ''
-  const offset = match[0].indexOf(value)
-  const start = (match.index ?? 0) + offset
-  return chars.slice(start, start + value.length)
+  return markdownSourceMap(input).text
 }
 
 function safeCssColor(color: string) {
