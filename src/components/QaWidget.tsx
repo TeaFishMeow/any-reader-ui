@@ -71,7 +71,7 @@ export function QaWidget({
     window.addEventListener('pointercancel', done)
   }
   const title = record
-    ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || record.customPromptTitle || t('window.qa')
+    ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || t('window.qa')
     : t('window.qa')
   const messages = record ? qaMessages(record, t('common.pendingAnswer')) : []
   const canContinue = !!record && record.answerStatus !== 'pending' && record.answerStatus !== 'streaming'

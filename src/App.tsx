@@ -430,28 +430,22 @@ export function App() {
 
   async function askTemplate(template: PromptTemplate) {
     if (!askMenu || !config || !repo || !canvas) return
-    const isCustom = isCustomAskTemplate(template)
     const record = createPendingRecord({
       action: askMenu.session.action,
       config,
       repo,
       documents,
       canvasId: canvas.id || MAIN_CANVAS_ID,
-      template: isCustom ? null : template,
+      template: isCustomAskTemplate(template) ? null : template,
       sourceParentRecord: askMenu.session.action.sourceQaRecordId
         ? activeRecords.find((record) => record.id === askMenu.session.action.sourceQaRecordId) ?? null
         : null
     })
-    if (isCustom) {
-      record.customPromptTitle = template.title
-      record.answerStatus = 'aborted'
-    }
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
     openWidget((draft) => createQaRecordWidget(draft, record.id))
-    if (isCustom) return
-    void runRecord(record)
+    if (record.answerStatus === 'pending') void runRecord(record)
   }
 
   async function continueRecord(record: QARecord, question: string) {
