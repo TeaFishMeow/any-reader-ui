@@ -54,7 +54,6 @@ export const enUS = {
   'font.lxgwWenkai': 'LXGW WenKai',
   'settings.shortcut.directory': 'Directory',
   'settings.shortcut.reader': 'Reader',
-  'settings.shortcut.context': 'Context',
   'settings.shortcut.settings': 'Settings',
   'settings.shortcut.toggleTheme': 'Toggle dark/light',
   'settings.contextMode': 'Context mode',

@@ -241,7 +241,7 @@ export function App() {
       } else if (matchesShortcut(event, shortcutValue(config, 'toggleRight'))) {
         event.preventDefault()
         updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))
-      } else if (matchesShortcut(event, shortcutValue(config, 'openContext'))) {
+      } else if (matchesShortcut(event, shortcutValue(config, 'openSettings'))) {
         event.preventDefault()
         setModal('settings')
       } else if (matchesShortcut(event, shortcutValue(config, 'toggleTheme'))) {

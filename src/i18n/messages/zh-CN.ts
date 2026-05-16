@@ -52,7 +52,6 @@ export const zhCN = {
   'font.lxgwWenkai': '霞鹜文楷',
   'settings.shortcut.directory': '目录',
   'settings.shortcut.reader': '正文',
-  'settings.shortcut.context': '上下文',
   'settings.shortcut.settings': '设置',
   'settings.shortcut.toggleTheme': '切换深色/浅色',
   'settings.contextMode': '上下文模式',

@@ -185,7 +185,7 @@ export function SettingsWindow({
           {([
             ['toggleLeft', 'settings.shortcut.directory'],
             ['toggleRight', 'settings.shortcut.reader'],
-            ['openContext', 'settings.shortcut.settings'],
+            ['openSettings', 'settings.shortcut.settings'],
             ['toggleTheme', 'settings.shortcut.toggleTheme']
           ] as const satisfies readonly [ShortcutAction, MessageKey][]).map(([key, label]) => (
             <label key={key}>
