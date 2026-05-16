@@ -75,6 +75,7 @@ export function QaWidget({
     : t('window.qa')
   const messages = record ? qaMessages(record, t('common.pendingAnswer')) : []
   const canContinue = !!record && record.answerStatus !== 'pending' && record.answerStatus !== 'streaming'
+  const isEmptyCustomAsk = !!record && !record.questionText.trim() && !record.answerMarkdown.trim()
   const normalize = (text: string) => markdownToPlainText(text).replace(/\s+/g, '')
   const messageHighlights = (message: QaMessage) => {
     if (message.role !== 'assistant') return []
@@ -166,7 +167,7 @@ export function QaWidget({
           <textarea
             ref={questionRef}
             value={question}
-            placeholder={t('qa.followUpPlaceholder')}
+            placeholder={isEmptyCustomAsk ? t('qa.customAskPlaceholder') : t('qa.followUpPlaceholder')}
             disabled={!canContinue}
             onChange={(event) => setQuestion(event.target.value)}
             onInput={(event) => fitTextarea(event.currentTarget)}

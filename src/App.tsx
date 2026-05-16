@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from '../src_original_reference/lib/bootstrap'
 import { fetchRemoteDocument } from '../src_original_reference/lib/api'
-import { applyPromptTemplateDefaults, MAIN_CANVAS_ID } from '../src_original_reference/lib/defaults'
+import { MAIN_CANVAS_ID } from '../src_original_reference/lib/defaults'
 import { readMountedVaultTextFile } from '../src_original_reference/lib/fs'
 import {
   buildPendingAskSession,
@@ -46,6 +46,7 @@ import {
 } from './constants'
 import { isAbortError } from './lib/errors'
 import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
+import { applyPromptTemplateDefaults, isCustomAskTemplate } from './lib/promptTemplates'
 import { appendFollowUp, readableConversation } from './lib/qaConversation'
 import { matchesShortcut, shortcutValue } from './lib/shortcuts'
 import { applyTheme, setThemeMode, themeMode, themeStyle } from './lib/theme'
@@ -429,21 +430,27 @@ export function App() {
 
   async function askTemplate(template: PromptTemplate) {
     if (!askMenu || !config || !repo || !canvas) return
+    const isCustom = isCustomAskTemplate(template)
     const record = createPendingRecord({
       action: askMenu.session.action,
       config,
       repo,
       documents,
       canvasId: canvas.id || MAIN_CANVAS_ID,
-      template,
+      template: isCustom ? null : template,
       sourceParentRecord: askMenu.session.action.sourceQaRecordId
         ? activeRecords.find((record) => record.id === askMenu.session.action.sourceQaRecordId) ?? null
         : null
     })
+    if (isCustom) {
+      record.customPromptTitle = template.title
+      record.answerStatus = 'aborted'
+    }
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
     openWidget((draft) => createQaRecordWidget(draft, record.id))
+    if (isCustom) return
     void runRecord(record)
   }
 

@@ -20,6 +20,7 @@ import {
 import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
 import { setShortcut, shortcutFromEvent, shortcutValue, type ShortcutAction } from '../lib/shortcuts'
 import { fitTextarea } from '../lib/textarea'
+import { isCustomAskTemplate } from '../lib/promptTemplates'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -270,7 +271,9 @@ export function SettingsWindow({
         <section id="settings-templates" className="settings-wide">
           <h2>{t('settings.section.templates')}</h2>
           <div className="template-list">
-            {templates.map((template) => (
+            {templates.map((template) => {
+              const locked = isCustomAskTemplate(template)
+              return (
               <div
                 className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}${dragTarget?.id === template.id ? (dragTarget.after ? ' is-drop-after' : ' is-drop-before') : ''}`}
                 key={template.id}
@@ -290,14 +293,15 @@ export function SettingsWindow({
                   <Icon name="drag" />
                 </span>
                 <input type="checkbox" checked={template.isEnabled} aria-label={t('common.enable')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
-                <input className="template-color" type="color" value={template.color} aria-label={t('common.color')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
-                <input value={template.title} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
-                <input value={template.body} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
-                <button className="template-delete" type="button" aria-label={t('common.delete')} onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
+                <input className="template-color" type="color" value={template.color} aria-label={t('common.color')} disabled={locked} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
+                <input value={template.title} readOnly={locked} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
+                <input value={template.body} readOnly={locked} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
+                <button className="template-delete" type="button" aria-label={t('common.delete')} disabled={locked} onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
                   <Icon name="close" />
                 </button>
               </div>
-            ))}
+              )
+            })}
             <button className="template-add" type="button" aria-label={t('common.add')} onClick={() => onChange((draft) => ({
               ...draft,
               templates: [

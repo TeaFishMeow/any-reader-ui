@@ -17,6 +17,7 @@ export const zhCN = {
   'common.pendingAnswer': '等待回答...',
   'qa.user': '你',
   'qa.conversationSoFar': '已有对话',
+  'qa.customAskPlaceholder': '输入自定义问题...',
   'qa.followUpPlaceholder': '继续提问...',
   'qa.send': '发送',
   'window.directory': '目录',

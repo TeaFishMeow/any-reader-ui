@@ -19,6 +19,7 @@ export const enUS = {
   'common.pendingAnswer': 'Waiting for answer...',
   'qa.user': 'You',
   'qa.conversationSoFar': 'Conversation so far',
+  'qa.customAskPlaceholder': 'Enter a custom question...',
   'qa.followUpPlaceholder': 'Ask a follow-up...',
   'qa.send': 'Send',
   'window.directory': 'Directory',
