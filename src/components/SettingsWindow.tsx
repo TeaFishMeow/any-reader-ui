@@ -17,6 +17,7 @@ import {
   type ThemeMode,
   type ThemeStyle
 } from '../lib/theme'
+import { askSubmitShortcut, setAskSubmitShortcut, type AskSubmitShortcut } from '../lib/askInput'
 import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
 import { setShortcut, shortcutFromEvent, shortcutValue, type ShortcutAction } from '../lib/shortcuts'
 import { fitTextarea } from '../lib/textarea'
@@ -55,6 +56,7 @@ export function SettingsWindow({
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null)
   const [dragTarget, setDragTarget] = useState<{ id: string; after: boolean } | null>(null)
+  const [submitShortcut, setSubmitShortcutState] = useState(askSubmitShortcut)
   const sections = [
     ['settings-theme', 'settings.section.theme'],
     ['settings-shortcuts', 'settings.section.shortcuts'],
@@ -212,6 +214,20 @@ export function SettingsWindow({
               />
             </label>
           ))}
+          <label>
+            <span>{t('settings.askSubmitShortcut')}</span>
+            <select
+              value={submitShortcut}
+              onChange={(event) => {
+                const value = event.target.value as AskSubmitShortcut
+                setAskSubmitShortcut(value)
+                setSubmitShortcutState(value)
+              }}
+            >
+              <option value="enter">{t('settings.askSubmitShortcut.enter')}</option>
+              <option value="ctrl-enter">{t('settings.askSubmitShortcut.ctrlEnter')}</option>
+            </select>
+          </label>
         </section>
         <section id="settings-context">
           <h2>{t('settings.section.context')}</h2>

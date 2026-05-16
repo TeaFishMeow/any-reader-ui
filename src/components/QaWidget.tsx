@@ -5,6 +5,7 @@ import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AppConfig, AskAction, QARecord, WidgetState } from '../../src_original_reference/types/domain'
 import { useI18n } from '../i18n'
 import type { ResizeFrame } from '../types'
+import { shouldSubmitAsk } from '../lib/askInput'
 import { displayAnswerMarkdown, markedRecordIdFromTarget, markdownBlocks, renderInlineMath, selectionAction, type MarkdownHighlight } from '../lib/markdown'
 import { qaMessages, type QaMessage } from '../lib/qaConversation'
 import { fitTextarea } from '../lib/textarea'
@@ -175,7 +176,7 @@ export function QaWidget({
             onChange={(event) => setQuestion(event.target.value)}
             onInput={(event) => fitTextarea(event.currentTarget)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) submitFollowUp(event)
+              if (!event.shiftKey && shouldSubmitAsk(event.nativeEvent)) submitFollowUp(event)
             }}
           />
           <button type="submit" title={t('qa.send')} aria-label={t('qa.send')} disabled={!canContinue || !question.trim()}>
