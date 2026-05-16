@@ -55,6 +55,8 @@ export const enUS = {
   'settings.shortcut.directory': 'Directory',
   'settings.shortcut.reader': 'Reader',
   'settings.shortcut.context': 'Context',
+  'settings.shortcut.settings': 'Settings',
+  'settings.shortcut.toggleTheme': 'Toggle dark/light',
   'settings.contextMode': 'Context mode',
   'settings.viewportBlocks': 'Viewport blocks',
   'settings.viewportBlocksValue': '{count} blocks',

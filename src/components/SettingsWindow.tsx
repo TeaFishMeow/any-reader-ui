@@ -18,6 +18,7 @@ import {
   type ThemeStyle
 } from '../lib/theme'
 import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
+import { setShortcut, shortcutFromEvent, shortcutValue, type ShortcutAction } from '../lib/shortcuts'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -184,11 +185,22 @@ export function SettingsWindow({
           {([
             ['toggleLeft', 'settings.shortcut.directory'],
             ['toggleRight', 'settings.shortcut.reader'],
-            ['openContext', 'settings.shortcut.context']
-          ] as const).map(([key, label]) => (
+            ['openContext', 'settings.shortcut.settings'],
+            ['toggleTheme', 'settings.shortcut.toggleTheme']
+          ] as const satisfies readonly [ShortcutAction, MessageKey][]).map(([key, label]) => (
             <label key={key}>
               <span>{t(label)}</span>
-              <input value={config.shortcuts[key]} onChange={(event) => onChange((draft) => ({ ...draft, shortcuts: { ...draft.shortcuts, [key]: event.target.value.slice(-1).toLowerCase() || draft.shortcuts[key] } }))} />
+              <input
+                readOnly
+                value={shortcutValue(config, key)}
+                onFocus={(event) => event.currentTarget.select()}
+                onKeyDown={(event) => {
+                  const shortcut = shortcutFromEvent(event.nativeEvent)
+                  if (!shortcut) return
+                  event.preventDefault()
+                  onChange((draft) => setShortcut(draft, key, shortcut))
+                }}
+              />
             </label>
           ))}
         </section>

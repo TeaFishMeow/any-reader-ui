@@ -46,7 +46,8 @@ import {
 } from './constants'
 import { isAbortError } from './lib/errors'
 import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
-import { applyTheme, themeMode, themeStyle } from './lib/theme'
+import { matchesShortcut, shortcutValue } from './lib/shortcuts'
+import { applyTheme, setThemeMode, themeMode, themeStyle } from './lib/theme'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
 
 function highlightForRecord(record: QARecord): MarkdownHighlight {
@@ -63,6 +64,12 @@ type ZoomTarget = 'directory' | 'reader' | 'widget'
 
 function fontZoom(value: number, delta: number) {
   return Math.max(10, Math.min(32, value + delta))
+}
+
+function oppositeThemeMode() {
+  const mode = themeMode()
+  const current = mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : mode
+  return current === 'dark' ? 'light' : 'dark'
 }
 
 export function App() {
@@ -228,15 +235,18 @@ export function App() {
       }
       const target = event.target as HTMLElement | null
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return
-      if (key === config.shortcuts.toggleLeft) {
+      if (matchesShortcut(event, shortcutValue(config, 'toggleLeft'))) {
         event.preventDefault()
         updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))
-      } else if (key === config.shortcuts.toggleRight) {
+      } else if (matchesShortcut(event, shortcutValue(config, 'toggleRight'))) {
         event.preventDefault()
         updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))
-      } else if (key === config.shortcuts.openContext) {
+      } else if (matchesShortcut(event, shortcutValue(config, 'openContext'))) {
         event.preventDefault()
         setModal('settings')
+      } else if (matchesShortcut(event, shortcutValue(config, 'toggleTheme'))) {
+        event.preventDefault()
+        updateConfig((draft) => setThemeMode(draft, oppositeThemeMode()))
       } else if (key === 'escape') {
         setAskMenu(null)
         setFloatingMenu(null)
