@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MAIN_CANVAS_ID } from '../../src_original_reference/lib/defaults'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
@@ -76,6 +76,9 @@ export function QaWidget({
   const messages = record ? qaMessages(record, t('common.pendingAnswer')) : []
   const canContinue = !!record && record.answerStatus !== 'pending' && record.answerStatus !== 'streaming'
   const isEmptyCustomAsk = !!record && !record.questionText.trim() && !record.answerMarkdown.trim()
+  useEffect(() => {
+    if (isEmptyCustomAsk) setDetailsOpen(true)
+  }, [isEmptyCustomAsk, record?.id])
   const normalize = (text: string) => markdownToPlainText(text).replace(/\s+/g, '')
   const messageHighlights = (message: QaMessage) => {
     if (message.role !== 'assistant') return []
