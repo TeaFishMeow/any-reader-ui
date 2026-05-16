@@ -26,6 +26,11 @@ textarea {
   font: inherit;
 }
 
+input,
+textarea {
+  line-height: 20px;
+}
+
 button {
   cursor: pointer;
 }
