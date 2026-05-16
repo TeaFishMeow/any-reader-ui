@@ -198,12 +198,14 @@ export function SettingsWindow({
                   if (event.key === 'Escape') {
                     event.preventDefault()
                     onChange((draft) => setShortcut(draft, key, ''))
+                    event.currentTarget.blur()
                     return
                   }
                   const shortcut = shortcutFromEvent(event.nativeEvent)
                   if (!shortcut) return
                   event.preventDefault()
                   onChange((draft) => setShortcut(draft, key, shortcut))
+                  event.currentTarget.blur()
                 }}
               />
             </label>
