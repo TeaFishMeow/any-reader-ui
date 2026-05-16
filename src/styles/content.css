@@ -165,8 +165,15 @@
 }
 
 .qa-inner {
-  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.qa-thread {
+  min-height: 0;
   overflow: auto;
   padding: 10px;
 }
@@ -174,15 +181,16 @@
 .qa-answer.reader-body {
   height: auto;
   overflow: visible;
+  margin: 0 0 14px;
   padding: 0;
   background: transparent;
 }
 
 .detail-window {
   position: relative;
-  width: 100%;
   min-height: 35px;
-  margin-bottom: 10px;
+  width: calc(100% - 20px);
+  margin: 10px 10px 0;
   box-shadow: none;
 }
 
@@ -206,12 +214,62 @@
   margin: 3px 0 0;
 }
 
-.question-text {
-  margin-bottom: 12px;
+.qa-question {
+  margin: 0 0 12px auto;
   padding: 8px 10px;
-  border-left: 2px solid var(--accent);
+  max-width: 88%;
+  border: 1px solid var(--line);
   background: var(--panel-2);
   font-weight: 600;
+  line-height: 1.6;
+}
+
+.qa-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 35px;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.qa-composer textarea {
+  min-height: 35px;
+  max-height: 96px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  overflow: hidden;
+  resize: none;
+}
+
+.qa-composer textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.qa-composer button {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.qa-composer button:not(:disabled):hover,
+.qa-composer button:not(:disabled):focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+.qa-composer button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .resize-corner {

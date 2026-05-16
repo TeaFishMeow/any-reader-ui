@@ -215,7 +215,8 @@
 
 .settings-body textarea {
   min-height: 74px;
-  resize: vertical;
+  overflow: hidden;
+  resize: none;
 }
 
 .settings-body input:focus,

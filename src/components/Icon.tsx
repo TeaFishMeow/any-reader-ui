@@ -34,6 +34,8 @@ function iconPath(name: IconName) {
       return 'M3.5 8h9'
     case 'drag':
       return 'M5.5 4.5h.01M10.5 4.5h.01M5.5 8h.01M10.5 8h.01M5.5 11.5h.01M10.5 11.5h.01'
+    case 'send':
+      return 'M2.5 8h10M12.5 8 8.5 4M12.5 8l-4 4'
   }
 }
 

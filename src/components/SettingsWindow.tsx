@@ -19,6 +19,7 @@ import {
 } from '../lib/theme'
 import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
 import { setShortcut, shortcutFromEvent, shortcutValue, type ShortcutAction } from '../lib/shortcuts'
+import { fitTextarea } from '../lib/textarea'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -244,8 +245,10 @@ export function SettingsWindow({
           <label className="settings-textarea">
             <span>{t('settings.learningPrompt')}</span>
             <textarea
+              ref={fitTextarea}
               value={config.learning.prompt}
               placeholder={t('settings.learningPromptPlaceholder')}
+              onInput={(event) => fitTextarea(event.currentTarget)}
               onChange={(event) => onChange((draft) => ({
                 ...draft,
                 learning: { ...draft.learning, prompt: event.target.value }

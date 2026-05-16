@@ -15,6 +15,7 @@ export interface MarkdownHighlight {
   color: string
   anchorFrom?: number
   anchorTo?: number
+  quote?: string
 }
 
 export function titleForDocument(document: DocumentNode) {

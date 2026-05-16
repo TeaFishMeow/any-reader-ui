@@ -1,20 +1,21 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { MAIN_CANVAS_ID } from '../../src_original_reference/lib/defaults'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
-import type { AppConfig, AskAction, DocumentNode, QARecord, WidgetState } from '../../src_original_reference/types/domain'
+import type { AppConfig, AskAction, QARecord, WidgetState } from '../../src_original_reference/types/domain'
 import { useI18n } from '../i18n'
 import type { ResizeFrame } from '../types'
 import { displayAnswerMarkdown, markedRecordIdFromTarget, markdownBlocks, renderInlineMath, selectionAction, type MarkdownHighlight } from '../lib/markdown'
+import { qaMessages, type QaMessage } from '../lib/qaConversation'
+import { fitTextarea } from '../lib/textarea'
 import { DetailWindow } from './DetailWindow'
-import { IconButton } from './Icon'
+import { Icon, IconButton } from './Icon'
 import { resizeFrame, WindowFrame } from './WindowFrame'
 
 export function QaWidget({
   widget,
   record,
   highlights,
-  documents,
   config,
   onFocus,
   onFrameChange,
@@ -22,12 +23,12 @@ export function QaWidget({
   onClose,
   onDelete,
   onAsk,
+  onContinue,
   onOpenRecord
 }: {
   widget: WidgetState
   record: QARecord | null
   highlights: MarkdownHighlight[]
-  documents: DocumentNode[]
   config: AppConfig
   onFocus: () => void
   onFrameChange: (frame: ResizeFrame) => void
@@ -35,10 +36,14 @@ export function QaWidget({
   onClose: () => void
   onDelete: () => void
   onAsk: (action: AskAction) => void
+  onContinue: (question: string) => void
   onOpenRecord: (recordId: string) => void
 }) {
   const { t } = useI18n()
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [question, setQuestion] = useState('')
+  const questionRef = useRef<HTMLTextAreaElement | null>(null)
+  useLayoutEffect(() => fitTextarea(questionRef.current), [question])
   const drag = (event: React.PointerEvent) => {
     if ((event.target as HTMLElement).closest('button,input,textarea')) return
     onFocus()
@@ -65,12 +70,28 @@ export function QaWidget({
     window.addEventListener('pointerup', done)
     window.addEventListener('pointercancel', done)
   }
-  const sourceDocument = record?.sourceDocumentId ? documents.find((document) => document.id === record.sourceDocumentId) : null
-  const answerText = displayAnswerMarkdown(record?.answerMarkdown || (record?.answerStatus === 'pending' ? t('common.pendingAnswer') : ''))
   const title = record
     ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || record.customPromptTitle || t('window.qa')
     : t('window.qa')
-  const surfaceText = record ? markdownToPlainText(answerText) : ''
+  const messages = record ? qaMessages(record, t('common.pendingAnswer')) : []
+  const canContinue = !!record && record.answerStatus !== 'pending' && record.answerStatus !== 'streaming'
+  const normalize = (text: string) => markdownToPlainText(text).replace(/\s+/g, '')
+  const messageHighlights = (message: QaMessage) => {
+    if (message.role !== 'assistant') return []
+    const text = normalize(message.markdown)
+    return highlights.filter((highlight) => {
+      const quote = highlight.quote ? normalize(highlight.quote) : ''
+      if (!quote || highlight.anchorFrom === undefined || highlight.anchorTo === undefined) return true
+      return text.slice(highlight.anchorFrom, highlight.anchorTo) === quote || text.includes(quote)
+    })
+  }
+  const submitFollowUp = (event: React.FormEvent) => {
+    event.preventDefault()
+    const text = question.trim()
+    if (!canContinue || !text) return
+    setQuestion('')
+    onContinue(text)
+  }
 
   return (
     <WindowFrame
@@ -109,31 +130,54 @@ export function QaWidget({
           context={record?.readingContextSnapshot ?? ''}
           onToggle={() => setDetailsOpen((value) => !value)}
         />
-        <div className="question-text">{renderInlineMath(record?.questionText ?? '', `question-${widget.id}`)}</div>
-        <article
-          className="qa-answer reader-body markdown-body"
-          style={{ fontSize: config.rendering.widgetFontPx }}
-          onClick={(event) => {
-            const recordId = markedRecordIdFromTarget(event.target)
-            if (!recordId) return
-            event.preventDefault()
-            event.stopPropagation()
-            onOpenRecord(recordId)
-          }}
-          onMouseUp={(event) => {
-            const action = record ? selectionAction({
-              eventPoint: { x: event.clientX, y: event.clientY + 8 },
-              surface: 'widget',
-              target: { widgetId: widget.id },
-              sourceQaRecordId: record.id,
-              surfaceTitle: title,
-              surfaceText
-            }) : null
-            if (action) onAsk(action)
-          }}
-        >
-          {markdownBlocks(answerText, sourceDocument?.path, highlights)}
-        </article>
+        <div className="qa-thread" style={{ fontSize: config.rendering.widgetFontPx }}>
+          {messages.map((message, index) => message.role === 'user' ? (
+            <div className="qa-question" key={`user-${index}`}>
+              {renderInlineMath(message.markdown, `qa-question-${widget.id}-${index}`)}
+            </div>
+          ) : (
+            <article
+              className="qa-answer reader-body markdown-body"
+              key={`assistant-${index}`}
+              onClick={(event) => {
+                const recordId = markedRecordIdFromTarget(event.target)
+                if (!recordId) return
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenRecord(recordId)
+              }}
+              onMouseUp={(event) => {
+                const action = record ? selectionAction({
+                  eventPoint: { x: event.clientX, y: event.clientY + 8 },
+                  surface: 'widget',
+                  target: { widgetId: widget.id },
+                  sourceQaRecordId: record.id,
+                  surfaceTitle: title,
+                  surfaceText: markdownToPlainText(message.markdown)
+                }) : null
+                if (action) onAsk(action)
+              }}
+            >
+              {markdownBlocks(displayAnswerMarkdown(message.markdown), undefined, messageHighlights(message))}
+            </article>
+          ))}
+        </div>
+        <form className="qa-composer" onSubmit={submitFollowUp}>
+          <textarea
+            ref={questionRef}
+            value={question}
+            placeholder={t('qa.followUpPlaceholder')}
+            disabled={!canContinue}
+            onChange={(event) => setQuestion(event.target.value)}
+            onInput={(event) => fitTextarea(event.currentTarget)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) submitFollowUp(event)
+            }}
+          />
+          <button type="submit" title={t('qa.send')} aria-label={t('qa.send')} disabled={!canContinue || !question.trim()}>
+            <Icon name="send" />
+          </button>
+        </form>
       </div>
     </WindowFrame>
   )

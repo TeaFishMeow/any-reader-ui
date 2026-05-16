@@ -46,6 +46,7 @@ import {
 } from './constants'
 import { isAbortError } from './lib/errors'
 import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
+import { appendFollowUp, readableConversation } from './lib/qaConversation'
 import { matchesShortcut, shortcutValue } from './lib/shortcuts'
 import { applyTheme, setThemeMode, themeMode, themeStyle } from './lib/theme'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
@@ -55,7 +56,8 @@ function highlightForRecord(record: QARecord): MarkdownHighlight {
     id: record.id,
     color: record.visualStyle.color,
     anchorFrom: record.anchor.anchorFrom,
-    anchorTo: record.anchor.anchorTo
+    anchorTo: record.anchor.anchorTo,
+    quote: record.anchor.quote ?? record.selectedText
   }
 }
 
@@ -369,18 +371,18 @@ export function App() {
     }, true)
   }
 
-  async function runRecord(seed: QARecord) {
+  async function runRecord(seed: QARecord, requestRecord = seed) {
     if (!config) return
     const controller = new AbortController()
     activeRuns.current.set(seed.id, controller)
-    let text = ''
+    let text = seed.answerMarkdown
     let firstTokenAt: string | undefined
     let modelInfo: QARecord['modelInfo'] = buildModelInfo(config)
     const startedAt = Date.now()
     try {
       for await (const chunk of streamAnswer({
         config,
-        qaRecord: seed,
+        qaRecord: requestRecord,
         signal: controller.signal,
         onModelInfo: (next) => {
           modelInfo = next
@@ -410,9 +412,10 @@ export function App() {
       await saveQaRecord(done)
     } catch (runError) {
       if (isAbortError(runError)) return
+      const message = runError instanceof Error ? runError.message : 'Answer failed'
       const failed: QARecord = {
         ...seed,
-        answerMarkdown: runError instanceof Error ? runError.message : 'Answer failed',
+        answerMarkdown: text ? `${text}${message}` : message,
         answerStatus: 'error',
         modelInfo,
         updatedAt: new Date().toISOString()
@@ -442,6 +445,23 @@ export function App() {
     await saveQaRecord(record)
     openWidget((draft) => createQaRecordWidget(draft, record.id))
     void runRecord(record)
+  }
+
+  async function continueRecord(record: QARecord, question: string) {
+    const text = question.trim()
+    if (!config || !text || activeRuns.current.has(record.id)) return
+    const now = new Date().toISOString()
+    const next: QARecord = {
+      ...record,
+      answerMarkdown: appendFollowUp(record.answerMarkdown, text),
+      answerStatus: 'pending',
+      fullPrompt: `${record.fullPrompt}\n\n${t('qa.conversationSoFar')}:\n${readableConversation(record.answerMarkdown)}\n\n${t('qa.user')}:\n${text}`,
+      timing: { requestedAt: now },
+      updatedAt: now
+    }
+    setRecords((previous) => upsertQaRecord(previous, next))
+    await saveQaRecord(next)
+    void runRecord(next, { ...next, questionText: text, customPromptBody: text, answerMarkdown: readableConversation(next.answerMarkdown) })
   }
 
   async function removeRecord(record: QARecord | null, widgetId: string) {
@@ -509,7 +529,6 @@ export function App() {
               widget={widget}
               record={record}
               highlights={record ? widgetHighlights.get(record.id) ?? EMPTY_HIGHLIGHTS : EMPTY_HIGHLIGHTS}
-              documents={documents}
               config={config}
               onFocus={() => {
                 setZoomTarget('widget')
@@ -530,6 +549,7 @@ export function App() {
               onClose={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))}
               onDelete={() => void removeRecord(record, widget.id)}
               onAsk={openAsk}
+              onContinue={(question) => record && void continueRecord(record, question)}
               onOpenRecord={openRecordWidget}
             />
           )

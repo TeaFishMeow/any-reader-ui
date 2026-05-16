@@ -17,6 +17,7 @@ export type IconName =
   | 'plus'
   | 'minus'
   | 'drag'
+  | 'send'
 
 export type ModalName = 'settings' | null
 export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
