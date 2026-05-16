@@ -128,13 +128,13 @@ export function QaWidget({
       onMouseDown={onFocus}
     >
       <div className="qa-inner">
-        <DetailWindow
-          open={detailsOpen}
-          selectedText={record?.selectedText ?? ''}
-          context={record?.readingContextSnapshot ?? ''}
-          onToggle={() => setDetailsOpen((value) => !value)}
-        />
         <div className="qa-thread" style={{ fontSize: config.rendering.widgetFontPx }}>
+          <DetailWindow
+            open={detailsOpen}
+            selectedText={record?.selectedText ?? ''}
+            context={record?.readingContextSnapshot ?? ''}
+            onToggle={() => setDetailsOpen((value) => !value)}
+          />
           {messages.map((message, index) => message.role === 'user' ? (
             <div className="qa-question" key={`user-${index}`}>
               {renderInlineMath(message.markdown, `qa-question-${widget.id}-${index}`)}

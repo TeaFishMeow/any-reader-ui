@@ -166,7 +166,7 @@
 
 .qa-inner {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   overflow: hidden;
   background: var(--panel);
@@ -189,8 +189,8 @@
 .detail-window {
   position: relative;
   min-height: 35px;
-  width: calc(100% - 20px);
-  margin: 10px 10px 0;
+  width: 100%;
+  margin: 0 0 10px;
   box-shadow: none;
 }
 
