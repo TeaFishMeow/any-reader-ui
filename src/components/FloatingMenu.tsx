@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { AppConfig, LlmAccessState } from '../../src_original_reference/types/domain'
+import { useI18n } from '../i18n'
 import { selectionMenuPosition } from '../lib/menuPosition'
 import type { MenuState } from '../types'
 export function FloatingMenu({
@@ -17,6 +18,7 @@ export function FloatingMenu({
   onOpenSettings: () => void
   onSelectModel: (modelId: string) => void
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -36,7 +38,7 @@ export function FloatingMenu({
     <div ref={ref} className="floating-menu" style={selectionMenuPosition(state)}>
       {state.kind === 'model' ? (
         <>
-          <div className="floating-menu-row floating-menu-heading">模型选择</div>
+          <div className="floating-menu-row floating-menu-heading">{t('menu.modelSelect')}</div>
           {models.map((model) => (
             <button
               key={model.id}
@@ -48,11 +50,11 @@ export function FloatingMenu({
               <small>{model.cost}</small>
             </button>
           ))}
-          <a className="floating-menu-row floating-menu-subscription" href="/subscription">管理订阅</a>
+          <a className="floating-menu-row floating-menu-subscription" href="/subscription">{t('menu.manageSubscription')}</a>
         </>
       ) : (
         <button type="button" onClick={() => { onOpenSettings(); onClose() }}>
-          <span>Settings</span>
+          <span>{t('common.settings')}</span>
         </button>
       )}
     </div>

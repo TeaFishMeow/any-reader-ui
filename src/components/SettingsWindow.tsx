@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createId } from '../../src_original_reference/lib/text'
 import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
+import { localeOptions, useI18n, type Locale, type MessageKey } from '../i18n'
 import {
   setThemeChineseFont,
   setThemeEnglishFont,
@@ -21,14 +22,14 @@ import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
 
-const contextLabels: Record<ReadingContextMode, string> = {
-  paragraph: '当前段落',
-  section: '当前小节',
-  directory: '当前目录',
-  'viewport-range': '当前屏幕附近',
-  'manual-selection': '手动选区',
-  'widget-local': '当前窗口',
-  'sidebar-node': '左栏节点'
+const contextLabelKeys: Record<ReadingContextMode, MessageKey> = {
+  paragraph: 'contextMode.paragraph',
+  section: 'contextMode.section',
+  directory: 'contextMode.directory',
+  'viewport-range': 'contextMode.viewport-range',
+  'manual-selection': 'contextMode.manual-selection',
+  'widget-local': 'contextMode.widget-local',
+  'sidebar-node': 'contextMode.sidebar-node'
 }
 
 export function SettingsWindow({
@@ -46,16 +47,17 @@ export function SettingsWindow({
   onChange: (updater: (config: AppConfig) => AppConfig) => void
   onResize: (handle: ResizeHandle, dx: number, dy: number) => void
 }) {
+  const { locale, setLocale, t } = useI18n()
   const templates = sortTemplates(config.templates)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [draggingTemplateId, setDraggingTemplateId] = useState<string | null>(null)
   const [dragTarget, setDragTarget] = useState<{ id: string; after: boolean } | null>(null)
   const sections = [
-    ['settings-theme', '主题'],
-    ['settings-shortcuts', '快捷键'],
-    ['settings-context', '上下文'],
-    ['settings-repository', 'Repository'],
-    ['settings-templates', '提问选项']
+    ['settings-theme', 'settings.section.theme'],
+    ['settings-shortcuts', 'settings.section.shortcuts'],
+    ['settings-context', 'settings.section.context'],
+    ['settings-repository', 'settings.section.repository'],
+    ['settings-templates', 'settings.section.templates']
   ] as const
   const moveTemplate = (sourceId: string, targetId: string, after: boolean) => {
     if (sourceId === targetId) return
@@ -85,21 +87,21 @@ export function SettingsWindow({
   return (
     <WindowFrame
       className="settings-window"
-      title="设置"
-      actions={<IconButton icon="close" label="关闭" onClick={onClose} />}
+      title={t('common.settings')}
+      actions={<IconButton icon="close" label={t('common.close')} onClick={onClose} />}
       style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h, transform: 'none' }}
       onResize={onResize}
     >
       <div className="settings-body">
         <aside className="settings-nav">
-          {sections.map(([id, label]) => (
+          {sections.map(([id, labelKey]) => (
             <button key={id} type="button" onClick={() => {
               const container = contentRef.current
               const target = document.getElementById(id)
               if (!container || !target) return
               container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top
             }}>
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </aside>
@@ -124,68 +126,76 @@ export function SettingsWindow({
           }}
         >
         <section id="settings-theme">
-          <h2>主题</h2>
+          <h2>{t('settings.section.theme')}</h2>
           <label>
-            <span>颜色模式</span>
+            <span>{t('settings.language')}</span>
+            <select value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
+              {localeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t('settings.colorMode')}</span>
             <select
               value={themeMode()}
               onChange={(event) => onChange((draft) => setThemeMode(draft, event.target.value as ThemeMode))}
             >
-              <option value="system">跟随系统</option>
-              <option value="light">浅色模式</option>
-              <option value="dark">深色模式</option>
+              <option value="system">{t('settings.colorMode.system')}</option>
+              <option value="light">{t('settings.colorMode.light')}</option>
+              <option value="dark">{t('settings.colorMode.dark')}</option>
             </select>
           </label>
           <label>
-            <span>主题风格</span>
+            <span>{t('settings.themeStyle')}</span>
             <select
               value={themeStyle()}
               onChange={(event) => onChange((draft) => setThemeStyle(draft, event.target.value as ThemeStyle))}
             >
-              <option value="reading">阅读风格</option>
-              <option value="default">现代风格</option>
+              <option value="reading">{t('settings.themeStyle.reading')}</option>
+              <option value="default">{t('settings.themeStyle.default')}</option>
             </select>
           </label>
           <label>
-            <span>英文字体</span>
+            <span>{t('settings.englishFont')}</span>
             <select
               value={themeEnglishFont()}
               onChange={(event) => onChange((draft) => setThemeEnglishFont(draft, event.target.value as EnglishFont))}
             >
               {englishFontOptions.map((font) => (
-                <option key={font.value} value={font.value}>{font.label}</option>
+                <option key={font.value} value={font.value}>{t(font.labelKey)}</option>
               ))}
             </select>
           </label>
           <label>
-            <span>中文字体</span>
+            <span>{t('settings.chineseFont')}</span>
             <select
               value={themeChineseFont()}
               onChange={(event) => onChange((draft) => setThemeChineseFont(draft, event.target.value as ChineseFont))}
             >
               {chineseFontOptions.map((font) => (
-                <option key={font.value} value={font.value}>{font.label}</option>
+                <option key={font.value} value={font.value}>{t(font.labelKey)}</option>
               ))}
             </select>
           </label>
         </section>
         <section id="settings-shortcuts">
-          <h2>快捷键</h2>
+          <h2>{t('settings.section.shortcuts')}</h2>
           {([
-            ['toggleLeft', '目录'],
-            ['toggleRight', '正文'],
-            ['openContext', '上下文']
+            ['toggleLeft', 'settings.shortcut.directory'],
+            ['toggleRight', 'settings.shortcut.reader'],
+            ['openContext', 'settings.shortcut.context']
           ] as const).map(([key, label]) => (
             <label key={key}>
-              <span>{label}</span>
+              <span>{t(label)}</span>
               <input value={config.shortcuts[key]} onChange={(event) => onChange((draft) => ({ ...draft, shortcuts: { ...draft.shortcuts, [key]: event.target.value.slice(-1).toLowerCase() || draft.shortcuts[key] } }))} />
             </label>
           ))}
         </section>
         <section id="settings-context">
-          <h2>上下文</h2>
+          <h2>{t('settings.section.context')}</h2>
           <label>
-            <span>上下文模式</span>
+            <span>{t('settings.contextMode')}</span>
             <select
               value={config.context.defaultMode}
               onChange={(event) => onChange((draft) => ({
@@ -194,12 +204,12 @@ export function SettingsWindow({
               }))}
             >
               {allowedContextModesForNextAsk().map((mode) => (
-                <option key={mode} value={mode}>{contextLabels[mode]}</option>
+                <option key={mode} value={mode}>{t(contextLabelKeys[mode])}</option>
               ))}
             </select>
           </label>
           <label>
-            <span>视野块数</span>
+            <span>{t('settings.viewportBlocks')}</span>
             <input
               type="range"
               min="1"
@@ -210,13 +220,13 @@ export function SettingsWindow({
                 context: { ...draft.context, viewportRangeBlocks: Number(event.target.value) }
               }))}
             />
-            <small>{config.context.viewportRangeBlocks} 个块</small>
+            <small>{t('settings.viewportBlocksValue', { count: config.context.viewportRangeBlocks })}</small>
           </label>
           <label className="settings-textarea">
-            <span>学习提示</span>
+            <span>{t('settings.learningPrompt')}</span>
             <textarea
               value={config.learning.prompt}
-              placeholder="描述助手应该优先遵循的学习目标或解释风格。"
+              placeholder={t('settings.learningPromptPlaceholder')}
               onChange={(event) => onChange((draft) => ({
                 ...draft,
                 learning: { ...draft.learning, prompt: event.target.value }
@@ -225,18 +235,18 @@ export function SettingsWindow({
           </label>
         </section>
         <section id="settings-repository">
-          <h2>Repository</h2>
+          <h2>{t('settings.section.repository')}</h2>
           <label>
-            <span>Mode</span>
+            <span>{t('settings.repositoryMode')}</span>
             <input readOnly value={binding?.activeSourceMode ?? config.repository.sourceMode} />
           </label>
           <label>
-            <span>Source</span>
+            <span>{t('settings.repositorySource')}</span>
             <input readOnly value={binding?.sourceLabel ?? config.repository.mountedVaultPath ?? ''} />
           </label>
         </section>
         <section id="settings-templates" className="settings-wide">
-          <h2>提问选项</h2>
+          <h2>{t('settings.section.templates')}</h2>
           <div className="template-list">
             {templates.map((template) => (
               <div
@@ -257,23 +267,23 @@ export function SettingsWindow({
                 <span className="template-drag" aria-hidden="true">
                   <Icon name="drag" />
                 </span>
-                <input type="checkbox" checked={template.isEnabled} aria-label="启用" onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
-                <input className="template-color" type="color" value={template.color} aria-label="颜色" onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
+                <input type="checkbox" checked={template.isEnabled} aria-label={t('common.enable')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
+                <input className="template-color" type="color" value={template.color} aria-label={t('common.color')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
                 <input value={template.title} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
                 <input value={template.body} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
-                <button className="template-delete" type="button" aria-label="删除" onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
+                <button className="template-delete" type="button" aria-label={t('common.delete')} onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
                   <Icon name="close" />
                 </button>
               </div>
             ))}
-            <button className="template-add" type="button" aria-label="新增" onClick={() => onChange((draft) => ({
+            <button className="template-add" type="button" aria-label={t('common.add')} onClick={() => onChange((draft) => ({
               ...draft,
               templates: [
                 ...draft.templates,
                 {
                   id: createId('template'),
-                  title: '新选项',
-                  body: '输入提示词。',
+                  title: t('settings.templateNewTitle'),
+                  body: t('settings.templateNewBody'),
                   color: '#569cd6',
                   order: draft.templates.length,
                   isBuiltIn: false,

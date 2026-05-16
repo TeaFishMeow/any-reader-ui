@@ -34,6 +34,7 @@ import { QaWidget } from './components/QaWidget'
 import { SettingsWindow } from './components/SettingsWindow'
 import { Sidebar } from './components/Sidebar'
 import { resizeFrame, WindowFrame } from './components/WindowFrame'
+import { useI18n } from './i18n'
 import {
   DIRECTORY_AUTO_COLLAPSE_WIDTH,
   LEFT_DEFAULT,
@@ -65,6 +66,7 @@ function fontZoom(value: number, delta: number) {
 }
 
 export function App() {
+  const { t } = useI18n()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [repo, setRepo] = useState<RepoMeta | null>(null)
@@ -446,8 +448,8 @@ export function App() {
     }))
   }
 
-  if (loading) return <div className="boot">Loading workspace...</div>
-  if (error || !repo || !config || !canvas || !currentDocument) return <div className="boot">{error ?? 'Missing workspace state'}</div>
+  if (loading) return <div className="boot">{t('app.loading')}</div>
+  if (error || !repo || !config || !canvas || !currentDocument) return <div className="boot">{error ?? t('app.missingWorkspace')}</div>
 
   const leftWidth = config.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
   const readerLeft = leftWidth
@@ -457,7 +459,7 @@ export function App() {
   const dailyQuota = llmAccess?.dailyQuota ?? 0
   const dailyUsed = llmAccess?.dailyUsed ?? Math.max(0, dailyQuota - (llmAccess?.dailyRemaining ?? dailyQuota))
   const permanentBalance = llmAccess?.permanentBalance ?? llmAccess?.creditBalance ?? 0
-  const creditSummary = `${tier === 'free' ? 'Free' : tier.toUpperCase()} ${dailyUsed}/${dailyQuota} (+${permanentBalance})`
+  const creditSummary = `${tier === 'free' ? t('common.free') : tier.toUpperCase()} ${dailyUsed}/${dailyQuota} (+${permanentBalance})`
   const viewport = normalizeCanvasViewport(canvas.viewport)
   const visibleWidgets = canvas.widgetStates.filter((widget) => {
     if (widget.type === 'ask') return true
@@ -540,7 +542,7 @@ export function App() {
           setDirectoryFrame({ ...frame, x: 0, w: width })
           updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarWidth: width, leftSidebarCollapsed: collapsed } }))
         }}
-        actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="目录" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
+        actions={<IconButton icon={config.layout.leftSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label={t('window.directory')} onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, leftSidebarCollapsed: !draft.layout.leftSidebarCollapsed } }))} />}
         footerClassName="directory-footer"
         footer={
           <>
@@ -557,7 +559,7 @@ export function App() {
               <Icon name="star" />
               <span>{creditSummary}</span>
             </button>
-            <IconButton icon="settings" label="设置" onClick={() => setModal('settings')} />
+            <IconButton icon="settings" label={t('common.settings')} onClick={() => setModal('settings')} />
           </>
         }
       >
@@ -598,9 +600,9 @@ export function App() {
         actions={
           <>
             {!config.layout.rightSidebarCollapsed ? (
-              <IconButton icon="maximize" label="最大化" active={readerMaximized} onClick={() => setReaderMaximized((value) => !value)} />
+              <IconButton icon="maximize" label={t('window.maximize')} active={readerMaximized} onClick={() => setReaderMaximized((value) => !value)} />
             ) : null}
-            <IconButton icon={config.layout.rightSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label="正文" onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))} />
+            <IconButton icon={config.layout.rightSidebarCollapsed ? 'chevronRight' : 'chevronLeft'} label={t('window.reader')} onClick={() => updateConfig((draft) => ({ ...draft, layout: { ...draft.layout, rightSidebarCollapsed: !draft.layout.rightSidebarCollapsed } }))} />
           </>
         }
       >

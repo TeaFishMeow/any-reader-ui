@@ -1,4 +1,5 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import { useI18n } from '../i18n'
 import type { ResizeFrame, ResizeHandle } from '../types'
 
 export function resizeFrame(handle: ResizeHandle, frame: ResizeFrame, dx: number, dy: number, minW = 260, minH = 220) {
@@ -23,6 +24,7 @@ function ResizeHandles({
   handles?: ResizeHandle[]
   onResize: (handle: ResizeHandle, dx: number, dy: number) => void
 }) {
+  const { t } = useI18n()
   return (
     <>
       {handles.map((handle) => (
@@ -30,7 +32,7 @@ function ResizeHandles({
           key={handle}
           type="button"
           className={`resize-handle resize-handle-${handle}`}
-          aria-label="调整窗口大小"
+          aria-label={t('common.resizeWindow')}
           onPointerDown={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -84,6 +86,7 @@ export function WindowFrame({
   footerClassName?: string
   children: ReactNode
 }) {
+  const { t } = useI18n()
   const collapsedBlank = collapsed && onCollapsedBlankClick
   return (
     <section className={`window-frame ${className}${collapsed ? ' is-collapsed' : ''}${footer ? ' has-footer' : ''}${collapsedBlank ? ' has-collapsed-blank' : ''}`} style={style} onMouseDown={onMouseDown}>
@@ -91,7 +94,7 @@ export function WindowFrame({
         <div className="window-title">{title}</div>
         <div className="window-actions">{actions}</div>
       </header>
-      {collapsedBlank ? <button className="window-collapsed-blank" type="button" aria-label="展开" onClick={onCollapsedBlankClick} /> : !collapsed || footer ? <div className="window-body">{!collapsed ? children : null}</div> : null}
+      {collapsedBlank ? <button className="window-collapsed-blank" type="button" aria-label={t('common.expand')} onClick={onCollapsedBlankClick} /> : !collapsed || footer ? <div className="window-body">{!collapsed ? children : null}</div> : null}
       {footer ? <footer className={`window-footer ${footerClassName}`}>{footer}</footer> : null}
       {onResize && (!collapsed || resizeWhenCollapsed) ? <ResizeHandles handles={resizeHandles} onResize={onResize} /> : null}
     </section>

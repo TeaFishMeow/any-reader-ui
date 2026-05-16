@@ -1,4 +1,5 @@
 import { makeSummary } from '../../src_original_reference/lib/text'
+import { useI18n } from '../i18n'
 import { renderInlineMath } from '../lib/markdown'
 import { IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -14,20 +15,21 @@ export function DetailWindow({
   context: string
   onToggle: () => void
 }) {
+  const { t } = useI18n()
   return (
     <WindowFrame
       className="detail-window"
-      title="详情"
+      title={t('common.details')}
       collapsed={!open}
-      actions={<IconButton icon={open ? 'chevronUp' : 'chevronDown'} label="收起" active={!open} onClick={onToggle} />}
+      actions={<IconButton icon={open ? 'chevronUp' : 'chevronDown'} label={t('common.collapse')} active={!open} onClick={onToggle} />}
     >
       <div className="detail-body">
         <div>
-          <span>选中</span>
+          <span>{t('common.selected')}</span>
           <p>{renderInlineMath(selectedText, 'detail-selected')}</p>
         </div>
         <div>
-          <span>上下文</span>
+          <span>{t('common.context')}</span>
           <p>{renderInlineMath(makeSummary(context, 360), 'detail-context')}</p>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { MAIN_CANVAS_ID } from '../../src_original_reference/lib/defaults'
 import { sortTemplates } from '../../src_original_reference/lib/app-helpers'
 import { markdownToPlainText } from '../../src_original_reference/lib/text'
 import type { AppConfig, AskAction, DocumentNode, QARecord, WidgetState } from '../../src_original_reference/types/domain'
+import { useI18n } from '../i18n'
 import type { ResizeFrame } from '../types'
 import { displayAnswerMarkdown, markedRecordIdFromTarget, markdownBlocks, renderInlineMath, selectionAction, type MarkdownHighlight } from '../lib/markdown'
 import { DetailWindow } from './DetailWindow'
@@ -36,6 +37,7 @@ export function QaWidget({
   onAsk: (action: AskAction) => void
   onOpenRecord: (recordId: string) => void
 }) {
+  const { t } = useI18n()
   const [detailsOpen, setDetailsOpen] = useState(false)
   const drag = (event: React.PointerEvent) => {
     if ((event.target as HTMLElement).closest('button,input,textarea')) return
@@ -64,10 +66,10 @@ export function QaWidget({
     window.addEventListener('pointercancel', done)
   }
   const sourceDocument = record?.sourceDocumentId ? documents.find((document) => document.id === record.sourceDocumentId) : null
-  const answerText = displayAnswerMarkdown(record?.answerMarkdown || (record?.answerStatus === 'pending' ? '等待回答...' : ''))
+  const answerText = displayAnswerMarkdown(record?.answerMarkdown || (record?.answerStatus === 'pending' ? t('common.pendingAnswer') : ''))
   const title = record
-    ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || record.customPromptTitle || '问答'
-    : '问答'
+    ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || record.customPromptTitle || t('window.qa')
+    : t('window.qa')
   const surfaceText = record ? markdownToPlainText(answerText) : ''
 
   return (
@@ -93,9 +95,9 @@ export function QaWidget({
       onTitlePointerDown={drag}
       actions={
         <>
-          <IconButton icon={widget.isCollapsed ? 'chevronDown' : 'chevronUp'} label="收起" active={widget.isCollapsed} onClick={onToggle} />
-          <IconButton icon="trash" label="删除" danger onClick={onDelete} />
-          <IconButton icon="close" label="关闭" onClick={onClose} />
+          <IconButton icon={widget.isCollapsed ? 'chevronDown' : 'chevronUp'} label={t('common.collapse')} active={widget.isCollapsed} onClick={onToggle} />
+          <IconButton icon="trash" label={t('common.delete')} danger onClick={onDelete} />
+          <IconButton icon="close" label={t('common.close')} onClick={onClose} />
         </>
       }
       onMouseDown={onFocus}
