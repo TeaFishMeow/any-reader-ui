@@ -31,9 +31,9 @@ export function shortcutFromEvent(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' |
 }
 
 export function shortcutValue(config: AppConfig, action: ShortcutAction) {
-  if (action === 'openSettings') return localStorage.getItem(openSettingsKey) || defaultShortcuts.openSettings
-  if (action === 'toggleTheme') return localStorage.getItem(toggleThemeKey) || defaultShortcuts.toggleTheme
-  return config.shortcuts[action] || defaultShortcuts[action]
+  if (action === 'openSettings') return localStorage.getItem(openSettingsKey) ?? defaultShortcuts.openSettings
+  if (action === 'toggleTheme') return localStorage.getItem(toggleThemeKey) ?? defaultShortcuts.toggleTheme
+  return config.shortcuts[action] ?? defaultShortcuts[action]
 }
 
 export function setShortcut(config: AppConfig, action: ShortcutAction, value: string): AppConfig {

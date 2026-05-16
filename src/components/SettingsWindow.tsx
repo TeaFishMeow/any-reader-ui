@@ -195,6 +195,11 @@ export function SettingsWindow({
                 value={shortcutValue(config, key)}
                 onFocus={(event) => event.currentTarget.select()}
                 onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    onChange((draft) => setShortcut(draft, key, ''))
+                    return
+                  }
                   const shortcut = shortcutFromEvent(event.nativeEvent)
                   if (!shortcut) return
                   event.preventDefault()
