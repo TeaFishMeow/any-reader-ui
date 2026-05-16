@@ -219,6 +219,7 @@
   padding: 8px 10px;
   max-width: 88%;
   border: 1px solid var(--line);
+  border-radius: var(--control-radius);
   background: var(--panel-2);
   font-weight: 600;
   line-height: 1.6;
@@ -256,6 +257,7 @@
   height: 35px;
   padding: 0;
   border: 1px solid var(--line);
+  border-radius: var(--control-radius);
   background: var(--panel-2);
   color: var(--text);
 }

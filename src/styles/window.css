@@ -9,6 +9,10 @@
   overflow: hidden;
 }
 
+.window-frame:not(.directory-window):not(.reader-window) {
+  border-radius: var(--control-radius);
+}
+
 .window-frame.is-collapsed {
   grid-template-rows: 35px;
   height: 35px;

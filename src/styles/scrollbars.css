@@ -10,6 +10,7 @@
 ::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--line) 90%, var(--text));
   border: 2px solid var(--canvas);
+  border-radius: var(--control-radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
