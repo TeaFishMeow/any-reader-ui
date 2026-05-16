@@ -22,11 +22,13 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
 
 input,
+select,
 textarea {
   line-height: 20px;
 }
