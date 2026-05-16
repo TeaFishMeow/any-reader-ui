@@ -1,4 +1,4 @@
-import type { AppConfig } from '../../src_original_reference/types/domain'
+import type { AppConfig } from '../domain'
 import {
   chineseFontFamily,
   englishFontFamily,

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { createId } from '../../src_original_reference/lib/text'
-import { allowedContextModesForNextAsk, sortTemplates } from '../../src_original_reference/lib/app-helpers'
-import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../../src_original_reference/types/domain'
+import { createId } from '../lib/text'
+import { allowedContextModesForNextAsk, sortTemplates } from '../lib/app-helpers'
+import type { AppConfig, ReadingContextMode, RepositoryBinding } from '../domain'
 import { localeOptions, useI18n, type Locale, type MessageKey } from '../i18n'
 import {
   setThemeChineseFont,

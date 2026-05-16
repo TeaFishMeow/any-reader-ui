@@ -1,5 +1,5 @@
-import { applyPromptTemplateDefaults as applyReferencePromptTemplateDefaults } from '../../src_original_reference/lib/defaults'
-import type { PromptTemplate } from '../../src_original_reference/types/domain'
+import { applyPromptTemplateDefaults as applyReferencePromptTemplateDefaults } from './defaults'
+import type { PromptTemplate } from '../domain'
 
 export const CUSTOM_ASK_TEMPLATE_ID = 'template-custom-ask'
 

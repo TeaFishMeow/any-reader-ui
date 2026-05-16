@@ -1,4 +1,4 @@
-import { makeSummary } from '../../src_original_reference/lib/text'
+import { makeSummary } from '../lib/text'
 import { useI18n } from '../i18n'
 import { renderInlineMath } from '../lib/markdown'
 import { IconButton } from './Icon'

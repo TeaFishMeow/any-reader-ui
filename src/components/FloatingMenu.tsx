@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { AppConfig, LlmAccessState } from '../../src_original_reference/types/domain'
+import type { AppConfig, LlmAccessState } from '../domain'
 import { useI18n } from '../i18n'
 import { selectionMenuPosition } from '../lib/menuPosition'
 import type { MenuState } from '../types'

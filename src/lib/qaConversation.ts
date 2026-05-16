@@ -1,4 +1,4 @@
-import type { QARecord } from '../../src_original_reference/types/domain'
+import type { QARecord } from '../domain'
 
 export type QaMessage = {
   role: 'user' | 'assistant'

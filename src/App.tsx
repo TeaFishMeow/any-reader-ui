@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from '../src_original_reference/lib/bootstrap'
-import { fetchRemoteDocument } from '../src_original_reference/lib/api'
-import { MAIN_CANVAS_ID } from '../src_original_reference/lib/defaults'
-import { readMountedVaultTextFile } from '../src_original_reference/lib/fs'
+import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from './lib/bootstrap'
+import { fetchRemoteDocument } from './lib/api'
+import { MAIN_CANVAS_ID } from './lib/defaults'
+import { readMountedVaultTextFile } from './lib/fs'
 import {
   buildPendingAskSession,
   createPendingRecord,
@@ -10,9 +10,9 @@ import {
   normalizeCanvasViewport,
   sortTemplates,
   upsertQaRecord
-} from '../src_original_reference/lib/app-helpers'
-import { buildModelInfo, streamAnswer } from '../src_original_reference/lib/provider'
-import { hashString, markdownToPlainText } from '../src_original_reference/lib/text'
+} from './lib/app-helpers'
+import { buildModelInfo, streamAnswer } from './lib/provider'
+import { hashString, markdownToPlainText } from './lib/text'
 import type {
   AppConfig,
   AskAction,
@@ -26,7 +26,7 @@ import type {
   SidebarNode,
   WidgetState,
   WorkspaceSnapshot
-} from '../src_original_reference/types/domain'
+} from './domain'
 import { AskMenu } from './components/AskMenu'
 import { FloatingMenu } from './components/FloatingMenu'
 import { Icon, IconButton, Logo } from './components/Icon'

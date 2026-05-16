@@ -6,8 +6,8 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkRehype from 'remark-rehype'
 import rehypeStringify from 'rehype-stringify'
-import { markdownToPlainText } from '../../src_original_reference/lib/text'
-import type { AskAction, DocumentNode } from '../../src_original_reference/types/domain'
+import { markdownToPlainText } from './text'
+import type { AskAction, DocumentNode } from '../domain'
 import { katexDelimiters, katexDisplayAttribute, katexOptions, katexSourceAttribute } from './katexConfig'
 
 export interface MarkdownHighlight {

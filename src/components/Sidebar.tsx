@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { AskAction, DocumentNode, RepoMeta, SidebarNode } from '../../src_original_reference/types/domain'
+import type { AskAction, DocumentNode, RepoMeta, SidebarNode } from '../domain'
 import { Icon } from './Icon'
 
 export function Sidebar({

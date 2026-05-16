@@ -1,4 +1,4 @@
-import type { buildPendingAskSession } from '../src_original_reference/lib/app-helpers'
+import type { PendingAskSession } from './domain'
 
 export type IconName =
   | 'chevronLeft'
@@ -24,7 +24,7 @@ export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 export type ResizeFrame = { x: number; y: number; w: number; h: number }
 
 export interface AskMenuState {
-  session: ReturnType<typeof buildPendingAskSession>
+  session: PendingAskSession
   hoveredTemplateId: string | null
 }
 

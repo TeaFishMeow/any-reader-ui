@@ -1,4 +1,4 @@
-import { clamp } from '../../src_original_reference/lib/text'
+import { clamp } from './text'
 
 export function selectionMenuPosition(point: { x: number; y: number }) {
   const margin = 12

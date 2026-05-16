@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { PromptTemplate } from '../../src_original_reference/types/domain'
+import type { PromptTemplate } from '../domain'
 import type { AskMenuState } from '../types'
 import { selectionMenuPosition } from '../lib/menuPosition'
 
