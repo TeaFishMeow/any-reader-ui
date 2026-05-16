@@ -170,6 +170,7 @@ export function QaWidget({
         <form className="qa-composer" onSubmit={submitFollowUp}>
           <textarea
             ref={questionRef}
+            rows={1}
             value={question}
             placeholder={isEmptyCustomAsk ? t('qa.customAskPlaceholder') : t('qa.followUpPlaceholder')}
             disabled={!canContinue}

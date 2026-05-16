@@ -263,6 +263,7 @@ export function SettingsWindow({
             <span>{t('settings.learningPrompt')}</span>
             <textarea
               ref={fitTextarea}
+              rows={1}
               value={config.learning.prompt}
               placeholder={t('settings.learningPromptPlaceholder')}
               onInput={(event) => fitTextarea(event.currentTarget)}
