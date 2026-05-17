@@ -21,7 +21,7 @@ import { askSubmitShortcut, setAskSubmitShortcut, type AskSubmitShortcut } from 
 import { chineseFontOptions, englishFontOptions } from '../lib/themeFonts'
 import { setShortcut, shortcutFromEvent, shortcutValue, type ShortcutAction } from '../lib/shortcuts'
 import { fitTextarea } from '../lib/textarea'
-import { isCustomAskTemplate } from '../lib/promptTemplates'
+import { isCustomAskTemplate, isNoteTemplate } from '../lib/promptTemplates'
 import type { ResizeFrame, ResizeHandle } from '../types'
 import { Icon, IconButton } from './Icon'
 import { WindowFrame } from './WindowFrame'
@@ -289,7 +289,7 @@ export function SettingsWindow({
           <h2>{t('settings.section.templates')}</h2>
           <div className="template-list">
             {templates.map((template) => {
-              const locked = isCustomAskTemplate(template)
+              const locked = isCustomAskTemplate(template) || isNoteTemplate(template)
               return (
               <div
                 className={`template-row${draggingTemplateId === template.id ? ' is-dragging' : ''}${dragTarget?.id === template.id ? (dragTarget.after ? ' is-drop-after' : ' is-drop-before') : ''}`}

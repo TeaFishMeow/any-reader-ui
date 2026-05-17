@@ -30,6 +30,7 @@ import type {
 import { AskMenu } from './components/AskMenu'
 import { FloatingMenu } from './components/FloatingMenu'
 import { Icon, IconButton, Logo } from './components/Icon'
+import { NoteWidget } from './components/NoteWidget'
 import { QaWidget } from './components/QaWidget'
 import { SettingsWindow } from './components/SettingsWindow'
 import { Sidebar } from './components/Sidebar'
@@ -46,7 +47,7 @@ import {
 } from './constants'
 import { isAbortError } from './lib/errors'
 import { markedPreviewFromTarget, markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
-import { applyPromptTemplateDefaults, isCustomAskTemplate } from './lib/promptTemplates'
+import { applyPromptTemplateDefaults, isCustomAskTemplate, isNoteTemplate } from './lib/promptTemplates'
 import { appendFollowUp, readableConversation } from './lib/qaConversation'
 import { selectionMenuPosition } from './lib/menuPosition'
 import { matchesShortcut, shortcutValue } from './lib/shortcuts'
@@ -439,7 +440,7 @@ export function App() {
 
   async function askTemplate(template: PromptTemplate) {
     if (!askMenu || !config || !repo || !canvas) return
-    const record = createPendingRecord({
+    const pendingRecord = createPendingRecord({
       action: askMenu.session.action,
       config,
       repo,
@@ -450,11 +451,20 @@ export function App() {
         ? activeRecords.find((record) => record.id === askMenu.session.action.sourceQaRecordId) ?? null
         : null
     })
+    const record: QARecord = isNoteTemplate(template)
+      ? { ...pendingRecord, questionText: '', fullPrompt: '', answerStatus: 'done' }
+      : pendingRecord
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
     openWidget((draft) => createQaRecordWidget(draft, record.id))
     if (record.answerStatus === 'pending') void runRecord(record)
+  }
+
+  function updateRecordAnswer(record: QARecord, answerMarkdown: string, persist = false) {
+    const next = { ...record, answerMarkdown, answerStatus: 'done' as const, updatedAt: new Date().toISOString() }
+    setRecords((previous) => upsertQaRecord(previous, next))
+    if (persist) void saveQaRecord(next)
   }
 
   async function continueRecord(record: QARecord, question: string) {
@@ -533,6 +543,39 @@ export function App() {
       >
         {visibleWidgets.map((widget) => {
           const record = widget.type === 'qa-record' ? activeRecords.find((item) => item.id === widget.props.qaRecordId) ?? null : null
+          const focusWidget = () => {
+            setZoomTarget('widget')
+            updateCanvas((draft) => {
+              const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
+              return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
+            })
+          }
+          const changeFrame = (frame: ResizeFrame) => updateCanvas((draft) => ({
+            ...draft,
+            widgetStates: draft.widgetStates.map((item) =>
+              item.id === widget.id
+                ? { ...item, position: { x: frame.x, y: frame.y }, size: { w: frame.w, h: frame.h } }
+                : item
+            )
+          }))
+          const toggleWidget = () => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, isCollapsed: !item.isCollapsed } : item) }))
+          const closeWidget = () => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))
+          if (record?.promptTemplateId && isNoteTemplate({ id: record.promptTemplateId })) {
+            return (
+              <NoteWidget
+                key={widget.id}
+                widget={widget}
+                record={record}
+                config={config}
+                onFocus={focusWidget}
+                onFrameChange={changeFrame}
+                onToggle={toggleWidget}
+                onClose={closeWidget}
+                onDelete={() => void removeRecord(record, widget.id)}
+                onChange={(text, persist) => updateRecordAnswer(record, text, persist)}
+              />
+            )
+          }
           return (
             <QaWidget
               key={widget.id}
@@ -540,23 +583,10 @@ export function App() {
               record={record}
               highlights={record ? widgetHighlights.get(record.id) ?? EMPTY_HIGHLIGHTS : EMPTY_HIGHLIGHTS}
               config={config}
-              onFocus={() => {
-                setZoomTarget('widget')
-                updateCanvas((draft) => {
-                  const z = Math.max(0, ...draft.widgetStates.map((item) => item.zIndex)) + 1
-                  return { ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, zIndex: z } : item), selection: { widgetId: widget.id } }
-                })
-              }}
-              onFrameChange={(frame) => updateCanvas((draft) => ({
-                ...draft,
-                widgetStates: draft.widgetStates.map((item) =>
-                  item.id === widget.id
-                    ? { ...item, position: { x: frame.x, y: frame.y }, size: { w: frame.w, h: frame.h } }
-                    : item
-                )
-              }))}
-              onToggle={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.map((item) => item.id === widget.id ? { ...item, isCollapsed: !item.isCollapsed } : item) }))}
-              onClose={() => updateCanvas((draft) => ({ ...draft, widgetStates: draft.widgetStates.filter((item) => item.id !== widget.id) }))}
+              onFocus={focusWidget}
+              onFrameChange={changeFrame}
+              onToggle={toggleWidget}
+              onClose={closeWidget}
               onDelete={() => void removeRecord(record, widget.id)}
               onAsk={openAsk}
               onContinue={(question) => record && void continueRecord(record, question)}
