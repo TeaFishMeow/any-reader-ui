@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type { CSSProperties, MouseEventHandler, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useI18n } from '../i18n'
 import type { ResizeFrame, ResizeHandle } from '../types'
 
@@ -76,7 +76,7 @@ export function WindowFrame({
   className?: string
   collapsed?: boolean
   style?: CSSProperties
-  onMouseDown?: () => void
+  onMouseDown?: MouseEventHandler<HTMLElement>
   onCollapsedBlankClick?: () => void
   onTitlePointerDown?: (event: ReactPointerEvent<HTMLElement>) => void
   onResize?: (handle: ResizeHandle, dx: number, dy: number) => void

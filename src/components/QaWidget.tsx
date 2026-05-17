@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { MAIN_CANVAS_ID } from '../lib/defaults'
 import { sortTemplates } from '../lib/app-helpers'
 import { markdownToPlainText } from '../lib/text'
@@ -12,6 +12,9 @@ import { fitTextarea } from '../lib/textarea'
 import { DetailWindow } from './DetailWindow'
 import { Icon, IconButton } from './Icon'
 import { resizeFrame, WindowFrame } from './WindowFrame'
+
+const EMPTY_HIGHLIGHTS: MarkdownHighlight[] = []
+const normalizeMarkdownText = (text: string) => markdownToPlainText(text).replace(/\s+/g, '')
 
 export function QaWidget({
   widget,
@@ -74,22 +77,22 @@ export function QaWidget({
   const title = record
     ? sortTemplates(config.templates).find((template) => template.id === record.promptTemplateId)?.title || t('window.qa')
     : t('window.qa')
-  const messages = record ? qaMessages(record, t('common.pendingAnswer')) : []
+  const pendingAnswer = t('common.pendingAnswer')
+  const messages = useMemo(() => record ? qaMessages(record, pendingAnswer) : [], [record, pendingAnswer])
   const canContinue = !!record && record.answerStatus !== 'pending' && record.answerStatus !== 'streaming'
   const isEmptyCustomAsk = !!record && !record.questionText.trim() && !record.answerMarkdown.trim()
   useEffect(() => {
     if (isEmptyCustomAsk) setDetailsOpen(true)
   }, [isEmptyCustomAsk, record?.id])
-  const normalize = (text: string) => markdownToPlainText(text).replace(/\s+/g, '')
-  const messageHighlights = (message: QaMessage) => {
-    if (message.role !== 'assistant') return []
-    const text = normalize(message.markdown)
+  const messageHighlights = useMemo(() => messages.map((message) => {
+    if (message.role !== 'assistant') return EMPTY_HIGHLIGHTS
+    const text = normalizeMarkdownText(message.markdown)
     return highlights.filter((highlight) => {
-      const quote = highlight.quote ? normalize(highlight.quote) : ''
+      const quote = highlight.quote ? normalizeMarkdownText(highlight.quote) : ''
       if (!quote || highlight.anchorFrom === undefined || highlight.anchorTo === undefined) return true
       return text.slice(highlight.anchorFrom, highlight.anchorTo) === quote || text.includes(quote)
     })
-  }
+  }), [messages, highlights])
   const submitFollowUp = (event: React.FormEvent) => {
     event.preventDefault()
     const text = question.trim()
@@ -163,7 +166,7 @@ export function QaWidget({
                 if (action) onAsk(action)
               }}
             >
-              {markdownBlocks(displayAnswerMarkdown(message.markdown), undefined, messageHighlights(message))}
+              {markdownBlocks(displayAnswerMarkdown(message.markdown), undefined, messageHighlights[index] ?? EMPTY_HIGHLIGHTS)}
             </article>
           ))}
         </div>
