@@ -67,6 +67,7 @@ function highlightForRecord(record: QARecord): MarkdownHighlight {
 }
 
 const EMPTY_HIGHLIGHTS: MarkdownHighlight[] = []
+const NOTE_WIDGET_SIZE = { w: 320, h: 260 }
 type ZoomTarget = 'directory' | 'reader' | 'widget'
 
 function fontZoom(value: number, delta: number) {
@@ -338,7 +339,7 @@ export function App() {
     }, true)
   }
 
-  function createQaRecordWidget(draft: CanvasState, recordId: string): WidgetState {
+  function createQaRecordWidget(draft: CanvasState, recordId: string, size?: { w: number; h: number }): WidgetState {
     const frame = nextWidgetFrame(draft, { width: window.innerWidth, height: window.innerHeight })
     const viewport = normalizeCanvasViewport(draft.viewport)
     const leftPanelWidth = config!.layout.leftSidebarCollapsed ? RAIL_WIDTH : directoryFrame.w
@@ -353,6 +354,7 @@ export function App() {
 
     return {
       ...frame,
+      size: size ?? frame.size,
       position: {
         x: Math.round((screenX - viewport.x) / viewport.zoom),
         y: Math.round((screenY - viewport.y) / viewport.zoom)
@@ -363,7 +365,8 @@ export function App() {
   }
 
   function openRecordWidget(recordId: string) {
-    if (!canvas || !config || !activeRecords.some((record) => record.id === recordId)) return
+    const record = activeRecords.find((record) => record.id === recordId)
+    if (!canvas || !config || !record) return
     setAskMenu(null)
     updateCanvas((draft) => {
       const zIndex = Math.max(0, ...draft.widgetStates.map((widget) => widget.zIndex)) + 1
@@ -377,7 +380,7 @@ export function App() {
           selection: { widgetId: existing.id }
         }
       }
-      const widget = createQaRecordWidget(draft, recordId)
+      const widget = createQaRecordWidget(draft, recordId, record.promptTemplateId && isNoteTemplate({ id: record.promptTemplateId }) ? NOTE_WIDGET_SIZE : undefined)
       return { ...draft, widgetStates: [...draft.widgetStates, widget], selection: { widgetId: widget.id } }
     }, true)
   }
@@ -451,13 +454,14 @@ export function App() {
         ? activeRecords.find((record) => record.id === askMenu.session.action.sourceQaRecordId) ?? null
         : null
     })
-    const record: QARecord = isNoteTemplate(template)
+    const isNote = isNoteTemplate(template)
+    const record: QARecord = isNote
       ? { ...pendingRecord, questionText: '', fullPrompt: '', answerStatus: 'done' }
       : pendingRecord
     setAskMenu(null)
     setRecords((previous) => upsertQaRecord(previous, record))
     await saveQaRecord(record)
-    openWidget((draft) => createQaRecordWidget(draft, record.id))
+    openWidget((draft) => createQaRecordWidget(draft, record.id, isNote ? NOTE_WIDGET_SIZE : undefined))
     if (record.answerStatus === 'pending') void runRecord(record)
   }
 
