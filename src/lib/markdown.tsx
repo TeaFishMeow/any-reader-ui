@@ -16,6 +16,7 @@ export interface MarkdownHighlight {
   anchorFrom?: number
   anchorTo?: number
   quote?: string
+  preview?: string
 }
 
 export function titleForDocument(document: DocumentNode) {
@@ -29,6 +30,12 @@ export function markdownBlocks(markdown: string, documentPath?: string, highligh
 export function markedRecordIdFromTarget(target: EventTarget | null) {
   return target instanceof Element
     ? target.closest<HTMLElement>('[data-qa-record-id]')?.dataset.qaRecordId
+    : undefined
+}
+
+export function markedPreviewFromTarget(target: EventTarget | null) {
+  return target instanceof Element
+    ? target.closest<HTMLElement>('[data-qa-preview]')?.dataset.qaPreview
     : undefined
 }
 
@@ -86,7 +93,7 @@ function renderMarkdownHtml(markdown: string, documentPath?: string, highlights:
   return marked.markers.reduce(
     (nextHtml, marker) =>
       nextHtml
-        .replaceAll(marker.startToken, `<mark class="qa-source-highlight" data-qa-record-id="${escapeHtmlAttribute(marker.id)}" style="--qa-highlight-color: ${safeCssColor(marker.color)}">`)
+        .replaceAll(marker.startToken, `<mark class="qa-source-highlight" data-qa-record-id="${escapeHtmlAttribute(marker.id)}"${marker.preview ? ` data-qa-preview="${escapeHtmlAttribute(marker.preview)}"` : ''} style="--qa-highlight-color: ${safeCssColor(marker.color)}">`)
         .replaceAll(marker.endToken, '</mark>'),
     resolvedHtml
   )
@@ -180,7 +187,7 @@ function renderMathHtml(latex: string, displayMode: boolean, highlight?: Formula
   const highlighted = highlight?.id && highlight.color ? highlight : null
   const className = `${displayMode ? 'math-block' : 'math-inline'}${highlighted ? ' qa-source-highlight' : ''}`
   const highlightAttrs = highlighted
-    ? ` data-qa-record-id="${escapeHtmlAttribute(highlighted.id!)}" style="--qa-highlight-color: ${safeCssColor(highlighted.color!)}"`
+    ? ` data-qa-record-id="${escapeHtmlAttribute(highlighted.id!)}"${highlighted.preview ? ` data-qa-preview="${escapeHtmlAttribute(highlighted.preview)}"` : ''} style="--qa-highlight-color: ${safeCssColor(highlighted.color!)}"`
     : ''
   try {
     return `<${tag} class="${className}" ${sourceAttrs}${highlightAttrs}>${renderToString(latex, { ...katexOptions, displayMode })}</${tag}>`
@@ -213,8 +220,8 @@ function escapeHtmlAttribute(input: string) {
 }
 
 type MappedChar = { ch: string; source: number }
-type SourceRange = { id: string; color: string; start: number; end: number }
-type FormulaRange = { start: number; end: number; id?: string; color?: string }
+type SourceRange = { id: string; color: string; start: number; end: number; preview?: string }
+type FormulaRange = { start: number; end: number; id?: string; color?: string; preview?: string }
 type MarkdownNode = {
   type: string
   value?: string
@@ -269,7 +276,7 @@ function sourceRangesFromPlain(chars: MappedChar[], start: number, end: number, 
     .forEach((source) => {
       const last = ranges[ranges.length - 1]
       if (last && source === last.end) last.end = source + 1
-      else ranges.push({ id: highlight.id, color: highlight.color, start: source, end: source + 1 })
+      else ranges.push({ id: highlight.id, color: highlight.color, preview: highlight.preview, start: source, end: source + 1 })
     })
   return ranges
 }
@@ -292,6 +299,7 @@ function splitFormulaRanges(markdown: string, range: SourceRange, formulas: Form
     if (range.start >= formula.end || range.end <= formula.start) return
     formula.id = range.id
     formula.color = range.color
+    formula.preview = range.preview
     pieces.push(trimRange(markdown, { ...range, start: cursor, end: Math.min(range.end, formula.start) }))
     cursor = Math.max(cursor, formula.end)
   })

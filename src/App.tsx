@@ -45,20 +45,23 @@ import {
   VIEWPORT_HEIGHT
 } from './constants'
 import { isAbortError } from './lib/errors'
-import { markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
+import { markedPreviewFromTarget, markedRecordIdFromTarget, markdownBlocks, plainContextForDocument, selectionAction, titleForDocument, type MarkdownHighlight } from './lib/markdown'
 import { applyPromptTemplateDefaults, isCustomAskTemplate } from './lib/promptTemplates'
 import { appendFollowUp, readableConversation } from './lib/qaConversation'
+import { selectionMenuPosition } from './lib/menuPosition'
 import { matchesShortcut, shortcutValue } from './lib/shortcuts'
 import { applyTheme, setThemeMode, themeMode, themeStyle } from './lib/theme'
 import type { AskMenuState, MenuState, ModalName, ResizeFrame } from './types'
 
 function highlightForRecord(record: QARecord): MarkdownHighlight {
+  const preview = markdownToPlainText(record.answerMarkdown).replace(/\s+/g, ' ').trim()
   return {
     id: record.id,
     color: record.visualStyle.color,
     anchorFrom: record.anchor.anchorFrom,
     anchorTo: record.anchor.anchorTo,
-    quote: record.anchor.quote ?? record.selectedText
+    quote: record.anchor.quote ?? record.selectedText,
+    preview: preview ? preview.slice(0, 240) : undefined
   }
 }
 
@@ -90,6 +93,7 @@ export function App() {
   const [workspaceVersion, setWorkspaceVersion] = useState(0)
   const [askMenu, setAskMenu] = useState<AskMenuState | null>(null)
   const [floatingMenu, setFloatingMenu] = useState<MenuState | null>(null)
+  const [hoverPreview, setHoverPreview] = useState<{ text: string; x: number; y: number } | null>(null)
   const [modal, setModal] = useState<ModalName>(null)
   const [readerMaximized, setReaderMaximized] = useState(false)
   const [zoomTarget, setZoomTarget] = useState<ZoomTarget>('reader')
@@ -648,6 +652,11 @@ export function App() {
             event.stopPropagation()
             openRecordWidget(recordId)
           }}
+          onMouseMove={(event) => {
+            const text = markedPreviewFromTarget(event.target)
+            setHoverPreview(text ? { text, x: event.clientX, y: event.clientY } : null)
+          }}
+          onMouseLeave={() => setHoverPreview(null)}
           onMouseUp={(event) => {
             const action = selectionAction({
               eventPoint: { x: event.clientX, y: event.clientY + 8 },
@@ -662,6 +671,12 @@ export function App() {
           {markdownBlocks(currentDocument.contentMd, currentDocument.path, readerHighlights)}
         </article>
       </WindowFrame>
+
+      {hoverPreview ? (
+        <div className="floating-menu qa-preview-menu" style={selectionMenuPosition(hoverPreview)}>
+          {hoverPreview.text}
+        </div>
+      ) : null}
 
       {askMenu ? (
         <AskMenu

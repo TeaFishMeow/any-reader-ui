@@ -104,6 +104,18 @@
   outline: none;
 }
 
+.qa-preview-menu {
+  z-index: 300;
+  width: max-content;
+  max-width: min(380px, calc(100vw - 24px));
+  padding: 7px 9px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  white-space: normal;
+}
+
 .ask-menu span {
   font-weight: 600;
 }
