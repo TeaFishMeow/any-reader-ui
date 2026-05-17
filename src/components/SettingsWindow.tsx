@@ -310,7 +310,9 @@ export function SettingsWindow({
                   <Icon name="drag" />
                 </span>
                 <input type="checkbox" checked={template.isEnabled} aria-label={t('common.enable')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, isEnabled: event.target.checked } : item) }))} />
-                <input className="template-color" type="color" value={template.color} aria-label={t('common.color')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
+                <span className="template-color" style={{ backgroundColor: template.color }}>
+                  <input type="color" value={template.color} aria-label={t('common.color')} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, color: event.target.value } : item) }))} />
+                </span>
                 <input value={template.title} readOnly={locked} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, title: event.target.value } : item) }))} />
                 <input value={template.body} readOnly={locked} onChange={(event) => onChange((draft) => ({ ...draft, templates: draft.templates.map((item) => item.id === template.id ? { ...item, body: event.target.value } : item) }))} />
                 <button className="template-delete" type="button" aria-label={t('common.delete')} disabled={locked} onClick={() => onChange((draft) => ({ ...draft, templates: draft.templates.filter((item) => item.id !== template.id) }))}>
