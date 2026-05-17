@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { bootstrapWorkspace, deleteQaRecord, saveQaRecord, saveWorkspaceState } from './lib/bootstrap'
 import { fetchRemoteDocument } from './lib/api'
 import { MAIN_CANVAS_ID } from './lib/defaults'
@@ -109,6 +109,11 @@ export function App() {
   const [persistState, setPersistState] = useState<'idle' | 'dirty' | 'saving' | 'error'>('idle')
   const activeRuns = useRef(new Map<string, AbortController>())
   const persistTimer = useRef<number | null>(null)
+  const showHoverPreview = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    const text = markedPreviewFromTarget(event.target)
+    setHoverPreview(text ? { text, x: event.clientX, y: event.clientY } : null)
+  }, [])
+  const hideHoverPreview = useCallback(() => setHoverPreview(null), [])
 
   const documentMap = useMemo(() => new Map(documents.map((document) => [document.id, document])), [documents])
   const currentDocument = repo ? documentMap.get(repo.currentDocumentId) ?? documents[0] ?? null : null
@@ -556,6 +561,8 @@ export function App() {
               onAsk={openAsk}
               onContinue={(question) => record && void continueRecord(record, question)}
               onOpenRecord={openRecordWidget}
+              onPreviewMove={showHoverPreview}
+              onPreviewLeave={hideHoverPreview}
             />
           )
         })}
@@ -652,11 +659,8 @@ export function App() {
             event.stopPropagation()
             openRecordWidget(recordId)
           }}
-          onMouseMove={(event) => {
-            const text = markedPreviewFromTarget(event.target)
-            setHoverPreview(text ? { text, x: event.clientX, y: event.clientY } : null)
-          }}
-          onMouseLeave={() => setHoverPreview(null)}
+          onMouseMove={showHoverPreview}
+          onMouseLeave={hideHoverPreview}
           onMouseUp={(event) => {
             const action = selectionAction({
               eventPoint: { x: event.clientX, y: event.clientY + 8 },

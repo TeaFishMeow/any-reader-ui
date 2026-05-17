@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEventHandler } from 'react'
 import { MAIN_CANVAS_ID } from '../lib/defaults'
 import { sortTemplates } from '../lib/app-helpers'
 import { markdownToPlainText } from '../lib/text'
@@ -28,7 +28,9 @@ export function QaWidget({
   onDelete,
   onAsk,
   onContinue,
-  onOpenRecord
+  onOpenRecord,
+  onPreviewMove,
+  onPreviewLeave
 }: {
   widget: WidgetState
   record: QARecord | null
@@ -42,6 +44,8 @@ export function QaWidget({
   onAsk: (action: AskAction) => void
   onContinue: (question: string) => void
   onOpenRecord: (recordId: string) => void
+  onPreviewMove: MouseEventHandler<HTMLElement>
+  onPreviewLeave: MouseEventHandler<HTMLElement>
 }) {
   const { t } = useI18n()
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -147,6 +151,8 @@ export function QaWidget({
             <article
               className="qa-answer reader-body markdown-body"
               key={`assistant-${index}`}
+              onMouseMove={onPreviewMove}
+              onMouseLeave={onPreviewLeave}
               onClick={(event) => {
                 const recordId = markedRecordIdFromTarget(event.target)
                 if (!recordId) return
