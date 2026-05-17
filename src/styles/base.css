@@ -19,6 +19,7 @@ body {
   overflow: hidden;
   background: var(--canvas);
   color: var(--text);
+  text-autospace: normal;
 }
 
 button,
