@@ -8,7 +8,7 @@ const noteTemplate: PromptTemplate = {
   id: NOTE_TEMPLATE_ID,
   title: '笔记',
   body: '记录笔记。',
-  color: '#b45309',
+  color: '#eab308',
   order: 0,
   isBuiltIn: true,
   isEnabled: true,
