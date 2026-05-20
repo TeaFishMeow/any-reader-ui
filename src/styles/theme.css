@@ -12,9 +12,13 @@
   --accent: #3794ff;
   --danger: #f14c4c;
   --icon-size: 16px;
+  --scrollbar-track: color-mix(in srgb, var(--canvas) 90%, #000);
+  --scrollbar-thumb: color-mix(in srgb, var(--line) 52%, var(--text));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 42%, var(--text));
 }
 
 :root[data-theme='light'] {
+  color-scheme: light;
   --canvas: #f3f3f3;
   --panel: #f3f3f3;
   --panel-2: #ffffff;
@@ -23,6 +27,9 @@
   --muted: #616161;
   --accent: #007acc;
   --danger: #c42b1c;
+  --scrollbar-track: color-mix(in srgb, var(--canvas) 88%, #fff);
+  --scrollbar-thumb: color-mix(in srgb, var(--line) 72%, var(--muted));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 35%, var(--muted));
 }
 
 :root[data-theme-style='reading'][data-theme='light'] {
@@ -33,9 +40,13 @@
   --text: #2c2418;
   --muted: #7b6b52;
   --accent: #8a5a1f;
+  --scrollbar-track: color-mix(in srgb, var(--canvas) 86%, #fff);
+  --scrollbar-thumb: color-mix(in srgb, var(--line) 68%, var(--muted));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 42%, var(--muted));
 }
 
 :root[data-theme-style='reading'][data-theme='dark'] {
+  color-scheme: dark;
   --canvas: #080d14;
   --panel: #0d131c;
   --panel-2: #0a1018;
@@ -43,6 +54,9 @@
   --text: #d2d8df;
   --muted: #87919d;
   --accent: #8aa6c8;
+  --scrollbar-track: color-mix(in srgb, var(--canvas) 84%, #000);
+  --scrollbar-thumb: color-mix(in srgb, var(--line) 62%, var(--text));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 58%, var(--text));
 }
 
 @media (prefers-color-scheme: light) {
@@ -56,6 +70,9 @@
     --muted: #616161;
     --accent: #007acc;
     --danger: #c42b1c;
+    --scrollbar-track: color-mix(in srgb, var(--canvas) 88%, #fff);
+    --scrollbar-thumb: color-mix(in srgb, var(--line) 72%, var(--muted));
+    --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 35%, var(--muted));
   }
 
   :root[data-theme='system'][data-theme-style='reading'] {
@@ -66,10 +83,20 @@
     --text: #2c2418;
     --muted: #7b6b52;
     --accent: #8a5a1f;
+    --scrollbar-track: color-mix(in srgb, var(--canvas) 86%, #fff);
+    --scrollbar-thumb: color-mix(in srgb, var(--line) 68%, var(--muted));
+    --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 42%, var(--muted));
   }
 }
 
 @media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    color-scheme: dark;
+    --scrollbar-track: color-mix(in srgb, var(--canvas) 90%, #000);
+    --scrollbar-thumb: color-mix(in srgb, var(--line) 52%, var(--text));
+    --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 42%, var(--text));
+  }
+
   :root[data-theme='system'][data-theme-style='reading'] {
     --canvas: #080d14;
     --panel: #0d131c;
@@ -78,5 +105,8 @@
     --text: #d2d8df;
     --muted: #87919d;
     --accent: #8aa6c8;
+    --scrollbar-track: color-mix(in srgb, var(--canvas) 84%, #000);
+    --scrollbar-thumb: color-mix(in srgb, var(--line) 62%, var(--text));
+    --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 58%, var(--text));
   }
 }
